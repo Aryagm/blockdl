@@ -40,3 +40,23 @@
 .read-the-docs {
   color: #888;
 }
+
+/* LayerNode styling */
+.layer-node {
+  position: relative;
+}
+
+.layer-node .react-flow__handle {
+  width: 12px;
+  height: 12px;
+  border: 2px solid white;
+  border-radius: 50%;
+}
+
+.layer-node .react-flow__handle-top {
+  top: -6px;
+}
+
+.layer-node .react-flow__handle-bottom {
+  bottom: -6px;
+}

@@ -17,6 +17,7 @@ import type {
   NodeTypes
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { LayerNode } from './LayerNode'
 
 // Initial nodes and edges - start with empty canvas
 const initialNodes: Node[] = []
@@ -25,7 +26,25 @@ const initialEdges: Edge[] = []
 
 // Custom node types can be defined here
 const nodeTypes: NodeTypes = {
-  // Add custom node types as needed
+  layerNode: LayerNode,
+}
+
+// Default parameters for each layer type
+const getDefaultParams = (type: string): Record<string, any> => {
+  switch (type) {
+    case 'Dense':
+      return { units: 128 }
+    case 'Activation':
+      return { type: 'relu' }
+    case 'Dropout':
+      return { rate: 0.2 }
+    case 'Input':
+      return { shape: '(784,)' }
+    case 'Output':
+      return { units: 10, activation: 'softmax' }
+    default:
+      return {}
+  }
 }
 
 interface CanvasEditorProps {
@@ -97,11 +116,11 @@ function CanvasEditorInner({
 
       const newNode: Node = {
         id: `${layerType.toLowerCase()}-${Date.now()}`,
-        type: layerType === 'Input' ? 'input' : layerType === 'Output' ? 'output' : 'default',
+        type: 'layerNode',
         position,
         data: { 
-          label: `${layerType} Layer`,
-          layerType: layerType
+          type: layerType,
+          params: getDefaultParams(layerType)
         },
       }
 
