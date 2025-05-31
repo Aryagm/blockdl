@@ -106,25 +106,28 @@ export function CodeViewer({ nodes, edges, className = '' }: CodeViewerProps) {
         </CardHeader>
         <CardContent className="pt-0">
           <div className="rounded-md overflow-hidden border border-sidebar-border">
-            <CodeMirror
-              value={generatedCode}
-              height="400px"
-              extensions={[python()]}
-              theme={isDark ? oneDark : undefined}
-              editable={false}
-              basicSetup={{
-                lineNumbers: true,
-                foldGutter: true,
-                dropCursor: false,
-                allowMultipleSelections: false,
-                indentOnInput: false,
-                bracketMatching: true,
-                closeBrackets: false,
-                autocompletion: false,
-                highlightSelectionMatches: false,
-                searchKeymap: false,
-              }}
-            />
+            <div className="text-left">
+              <CodeMirror
+                value={generatedCode}
+                height="400px"
+                extensions={[python()]}
+                theme={isDark ? oneDark : undefined}
+                editable={false}
+                style={{ textAlign: 'left' }}
+                basicSetup={{
+                  lineNumbers: true,
+                  foldGutter: true,
+                  dropCursor: false,
+                  allowMultipleSelections: false,
+                  indentOnInput: false,
+                  bracketMatching: true,
+                  closeBrackets: false,
+                  autocompletion: false,
+                  highlightSelectionMatches: false,
+                  searchKeymap: false,
+                }}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
