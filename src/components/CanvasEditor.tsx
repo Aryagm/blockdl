@@ -18,6 +18,7 @@ import type {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { LayerNode } from './LayerNode'
+import { getOrderedLayers, validateNetworkStructure } from '../lib/graph-utils'
 
 // Initial nodes and edges - start with empty canvas
 const initialNodes: Node[] = []
@@ -76,18 +77,41 @@ function CanvasEditorInner({
   const handleNodesChange = useCallback(
     (changes: any) => {
       onNodesChangeInternal(changes)
-      onNodesChange?.(nodes)
+      
+      // Get updated nodes after changes are applied
+      const updatedNodes = nodes // This will be updated on next render
+      
+      // Validate network structure and get ordered layers
+      const orderedLayers = getOrderedLayers(updatedNodes, edges)
+      const validation = validateNetworkStructure(updatedNodes, edges)
+      
+      console.log('Network validation:', validation)
+      if (orderedLayers.length > 0) {
+        console.log('Ordered layers:', orderedLayers)
+      }
+      
+      onNodesChange?.(updatedNodes)
     },
-    [onNodesChangeInternal, onNodesChange, nodes]
+    [onNodesChangeInternal, onNodesChange, nodes, edges]
   )
 
   // Handle edges changes with callback
   const handleEdgesChange = useCallback(
     (changes: any) => {
       onEdgesChangeInternal(changes)
+      
+      // Validate network structure when edges change
+      const orderedLayers = getOrderedLayers(nodes, edges)
+      const validation = validateNetworkStructure(nodes, edges)
+      
+      console.log('Network validation (edges changed):', validation)
+      if (orderedLayers.length > 0) {
+        console.log('Ordered layers (edges changed):', orderedLayers)
+      }
+      
       onEdgesChange?.(edges)
     },
-    [onEdgesChangeInternal, onEdgesChange, edges]
+    [onEdgesChangeInternal, onEdgesChange, edges, nodes]
   )
 
   // Handle drag over event
