@@ -18,31 +18,10 @@ import type {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
-// Initial nodes and edges
-const initialNodes: Node[] = [
-  {
-    id: '1',
-    type: 'input',
-    data: { label: 'Input Node' },
-    position: { x: 250, y: 25 },
-  },
-  {
-    id: '2',
-    data: { label: 'Default Node' },
-    position: { x: 100, y: 125 },
-  },
-  {
-    id: '3',
-    type: 'output',
-    data: { label: 'Output Node' },
-    position: { x: 250, y: 250 },
-  },
-]
+// Initial nodes and edges - start with empty canvas
+const initialNodes: Node[] = []
 
-const initialEdges: Edge[] = [
-  { id: 'e1-2', source: '1', target: '2' },
-  { id: 'e2-3', source: '2', target: '3' },
-]
+const initialEdges: Edge[] = []
 
 // Custom node types can be defined here
 const nodeTypes: NodeTypes = {
@@ -104,11 +83,10 @@ function CanvasEditorInner({
       event.preventDefault()
 
       const reactFlowBounds = event.currentTarget.getBoundingClientRect()
-      const type = event.dataTransfer.getData('application/reactflow')
-      const layerType = event.dataTransfer.getData('application/layertype')
+      const layerType = event.dataTransfer.getData('layerType')
 
       // Check if the dropped element is valid
-      if (typeof type === 'undefined' || !type) {
+      if (typeof layerType === 'undefined' || !layerType) {
         return
       }
 
@@ -118,12 +96,12 @@ function CanvasEditorInner({
       })
 
       const newNode: Node = {
-        id: `${type}-${Date.now()}`,
-        type,
+        id: `${layerType.toLowerCase()}-${Date.now()}`,
+        type: layerType === 'Input' ? 'input' : layerType === 'Output' ? 'output' : 'default',
         position,
         data: { 
-          label: `${type} node`,
-          layerType: layerType || 'default'
+          label: `${layerType} Layer`,
+          layerType: layerType
         },
       }
 
