@@ -1,9 +1,18 @@
 import { AppShell } from './components/AppShell'
 import { ThemeProvider } from './components/ThemeProvider'
 import { ThemeToggle } from './components/ThemeToggle'
+import { CanvasEditor } from './components/CanvasEditor'
 import './App.css'
 
 function App() {
+  const onDragStart = (event: React.DragEvent, nodeType: string, layerType?: string) => {
+    event.dataTransfer.setData('application/reactflow', nodeType)
+    if (layerType) {
+      event.dataTransfer.setData('application/layertype', layerType)
+    }
+    event.dataTransfer.effectAllowed = 'move'
+  }
+
   const paletteContent = (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -11,29 +20,47 @@ function App() {
         <ThemeToggle />
       </div>
       <div className="space-y-2">
-        <div className="p-3 bg-sidebar-accent rounded-md text-sidebar-accent-foreground cursor-pointer hover:bg-sidebar-accent/80 transition-colors">
-          Block Component 1
+        <div 
+          className="p-3 bg-sidebar-accent rounded-md text-sidebar-accent-foreground cursor-pointer hover:bg-sidebar-accent/80 transition-colors"
+          draggable
+          onDragStart={(event) => onDragStart(event, 'input', 'component')}
+        >
+          Input Block
         </div>
-        <div className="p-3 bg-sidebar-accent rounded-md text-sidebar-accent-foreground cursor-pointer hover:bg-sidebar-accent/80 transition-colors">
-          Block Component 2
+        <div 
+          className="p-3 bg-sidebar-accent rounded-md text-sidebar-accent-foreground cursor-pointer hover:bg-sidebar-accent/80 transition-colors"
+          draggable
+          onDragStart={(event) => onDragStart(event, 'default', 'processing')}
+        >
+          Processing Block
         </div>
-        <div className="p-3 bg-sidebar-accent rounded-md text-sidebar-accent-foreground cursor-pointer hover:bg-sidebar-accent/80 transition-colors">
-          Block Component 3
+        <div 
+          className="p-3 bg-sidebar-accent rounded-md text-sidebar-accent-foreground cursor-pointer hover:bg-sidebar-accent/80 transition-colors"
+          draggable
+          onDragStart={(event) => onDragStart(event, 'output', 'display')}
+        >
+          Output Block
         </div>
-        <div className="p-3 bg-sidebar-accent rounded-md text-sidebar-accent-foreground cursor-pointer hover:bg-sidebar-accent/80 transition-colors">
-          Block Component 4
+        <div 
+          className="p-3 bg-sidebar-accent rounded-md text-sidebar-accent-foreground cursor-pointer hover:bg-sidebar-accent/80 transition-colors"
+          draggable
+          onDragStart={(event) => onDragStart(event, 'default', 'custom')}
+        >
+          Custom Block
         </div>
       </div>
     </div>
   )
 
   const canvasContent = (
-    <div className="h-full flex items-center justify-center border-2 border-dashed border-border rounded-lg">
-      <div className="text-center text-muted-foreground">
-        <h2 className="text-3xl font-bold mb-4">Block Canvas</h2>
-        <p className="text-lg">Drag and drop blocks here to build your application</p>
-      </div>
-    </div>
+    <CanvasEditor 
+      onNodesChange={(nodes) => {
+        console.log('Nodes changed:', nodes)
+      }}
+      onEdgesChange={(edges) => {
+        console.log('Edges changed:', edges)
+      }}
+    />
   )
 
   const codeViewerContent = (

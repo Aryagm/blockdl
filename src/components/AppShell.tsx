@@ -43,7 +43,7 @@ export function AppShell({
 
       {/* Center - Canvas */}
       <div className="flex-grow bg-background">
-        <div className="h-full p-4">
+        <div className="h-full">
           {canvas || (
             <div className="h-full flex items-center justify-center border-2 border-dashed border-border rounded-lg">
               <div className="text-center text-muted-foreground">
