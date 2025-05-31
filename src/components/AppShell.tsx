@@ -16,23 +16,23 @@ export function AppShell({
 }: AppShellProps) {
   return (
     <div className={cn(
-      "flex h-screen bg-background text-foreground",
+      "flex h-screen bg-slate-100 text-slate-900 min-w-[1280px]",
       className
     )}>
       {/* Left Sidebar - Palette */}
-      <div className="w-60 bg-sidebar border-r border-sidebar-border">
-        <div className="h-full p-4">
+      <div className="w-72 bg-white border-r border-slate-200 flex-shrink-0 shadow-sm">
+        <div className="h-full overflow-hidden">
           {palette || (
-            <div className="text-sidebar-foreground">
-              <h2 className="font-semibold mb-4">Palette</h2>
-              <div className="space-y-2">
-                <div className="p-2 bg-sidebar-accent rounded-md text-sidebar-accent-foreground">
+            <div className="p-6">
+              <h2 className="font-semibold mb-4 text-slate-800">Palette</h2>
+              <div className="space-y-3">
+                <div className="p-3 bg-slate-50 rounded-xl text-slate-700 border border-slate-200">
                   Palette Item 1
                 </div>
-                <div className="p-2 bg-sidebar-accent rounded-md text-sidebar-accent-foreground">
+                <div className="p-3 bg-slate-50 rounded-xl text-slate-700 border border-slate-200">
                   Palette Item 2
                 </div>
-                <div className="p-2 bg-sidebar-accent rounded-md text-sidebar-accent-foreground">
+                <div className="p-3 bg-slate-50 rounded-xl text-slate-700 border border-slate-200">
                   Palette Item 3
                 </div>
               </div>
@@ -42,12 +42,12 @@ export function AppShell({
       </div>
 
       {/* Center - Canvas */}
-      <div className="flex-grow bg-background">
+      <div className="flex-grow bg-white min-w-0">
         <div className="h-full">
           {canvas || (
-            <div className="h-full flex items-center justify-center border-2 border-dashed border-border rounded-lg">
-              <div className="text-center text-muted-foreground">
-                <h2 className="text-2xl font-semibold mb-2">Canvas Area</h2>
+            <div className="h-full flex items-center justify-center border-2 border-dashed border-slate-300 rounded-xl m-4">
+              <div className="text-center text-slate-500">
+                <h2 className="text-2xl font-semibold mb-2 text-slate-700">Canvas Area</h2>
                 <p>Your main content goes here</p>
               </div>
             </div>
@@ -56,12 +56,12 @@ export function AppShell({
       </div>
 
       {/* Right Sidebar - Code Viewer */}
-      <div className="w-96 bg-sidebar border-l border-sidebar-border">
-        <div className="h-full p-4">
+      <div className="w-96 bg-white border-l border-slate-200 flex-shrink-0 shadow-sm">
+        <div className="h-full overflow-hidden">
           {codeViewer || (
-            <div className="text-sidebar-foreground">
-              <h2 className="font-semibold mb-4">Code Viewer</h2>
-              <div className="bg-sidebar-accent rounded-md p-4 text-sidebar-accent-foreground font-mono text-sm">
+            <div className="p-6">
+              <h2 className="font-semibold mb-4 text-slate-800">Code Viewer</h2>
+              <div className="bg-slate-50 rounded-xl p-4 text-slate-700 font-mono text-sm border border-slate-200">
                 <pre>{`// Example code
 function example() {
   console.log("Hello world!");

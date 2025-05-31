@@ -172,7 +172,7 @@ function CanvasEditorInner({
       >
         <Controls />
         <MiniMap />
-        <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e2e8f0" />
       </ReactFlow>
     </div>
   )

@@ -1,5 +1,4 @@
 import { AppShell } from './components/AppShell'
-import { ThemeProvider } from './components/ThemeProvider'
 import { CanvasEditor } from './components/CanvasEditor'
 import { BlockPalette } from './components/BlockPalette'
 import { CodeViewer } from './components/CodeViewer'
@@ -28,13 +27,11 @@ function App() {
   )
 
   return (
-    <ThemeProvider defaultTheme="system" storageKey="blockdl-theme">
-      <AppShell 
-        palette={paletteContent}
-        canvas={canvasContent} 
-        codeViewer={codeViewerContent}
-      />
-    </ThemeProvider>
+    <AppShell 
+      palette={paletteContent}
+      canvas={canvasContent} 
+      codeViewer={codeViewerContent}
+    />
   )
 }
 

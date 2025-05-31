@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { ThemeToggle } from './ThemeToggle'
 
 const layerTypes = [
   { type: 'Input', icon: '📥', description: 'Input layer for data' },
@@ -21,28 +20,30 @@ export function BlockPalette({ className = '' }: BlockPaletteProps) {
   }
 
   return (
-    <div className={`space-y-4 ${className}`}>
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-sidebar-foreground">Block Palette</h2>
-        <ThemeToggle />
+    <div className={`space-y-6 p-6 h-full overflow-y-auto bg-slate-50/80 ${className}`}>
+      <div className="flex items-center">
+        <h2 className="font-semibold text-slate-800 text-lg">Block Palette</h2>
       </div>
       
-      <div className="space-y-3">
+      <div className="space-y-4">
         {layerTypes.map((layer) => (
           <Card
             key={layer.type}
-            className="cursor-move hover:shadow-md transition-all duration-200 hover:scale-[1.02] border-sidebar-border bg-sidebar-accent/50 hover:bg-sidebar-accent"
+            className="cursor-move hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-slate-200 bg-white hover:bg-slate-50 rounded-xl shadow-sm hover:shadow-slate-200"
             draggable
             onDragStart={(event) => handleDragStart(event, layer.type)}
+            style={{ cursor: 'grab' }}
+            onMouseDown={(e) => e.currentTarget.style.cursor = 'grabbing'}
+            onMouseUp={(e) => e.currentTarget.style.cursor = 'grab'}
           >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2 text-sidebar-accent-foreground">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-3 text-slate-700">
                 <span className="text-lg">{layer.icon}</span>
                 {layer.type}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <p className="text-xs text-sidebar-muted-foreground">
+              <p className="text-xs text-slate-500">
                 {layer.description}
               </p>
             </CardContent>
@@ -50,14 +51,15 @@ export function BlockPalette({ className = '' }: BlockPaletteProps) {
         ))}
       </div>
       
-      <Card className="border-sidebar-border bg-sidebar-accent/30">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-sidebar-accent-foreground">
-            💡 How to use
+      <Card className="border-slate-200 bg-blue-50/50 rounded-xl shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm text-blue-700 flex items-center gap-2">
+            <span>💡</span>
+            How to use
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
-          <p className="text-xs text-sidebar-muted-foreground">
+          <p className="text-xs text-blue-600">
             Drag and drop blocks onto the canvas to build your neural network architecture.
           </p>
         </CardContent>

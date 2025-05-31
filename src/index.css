@@ -112,10 +112,10 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-slate-200;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-slate-100 text-slate-900;
   }
 }
 

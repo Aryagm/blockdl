@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { python } from '@codemirror/lang-python'
-import { oneDark } from '@codemirror/theme-one-dark'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Copy, Download } from 'lucide-react'
@@ -16,25 +15,6 @@ interface CodeViewerProps {
 
 export function CodeViewer({ nodes, edges, className = '' }: CodeViewerProps) {
   const [generatedCode, setGeneratedCode] = useState<string>('')
-  const [isDark, setIsDark] = useState(false)
-
-  // Detect theme from document
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'))
-    }
-    
-    checkTheme()
-    
-    // Watch for theme changes
-    const observer = new MutationObserver(checkTheme)
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    })
-    
-    return () => observer.disconnect()
-  }, [])
 
   // Re-generate code when nodes or edges change
   useEffect(() => {
@@ -73,22 +53,23 @@ export function CodeViewer({ nodes, edges, className = '' }: CodeViewerProps) {
   }
 
   return (
-    <div className={`space-y-4 ${className}`}>
-      <Card className="border-sidebar-border bg-sidebar-accent/50">
-        <CardHeader className="pb-3">
+    <div className={`space-y-6 p-6 h-full overflow-y-auto bg-slate-50/80 ${className}`}>
+      <Card className="border-slate-200 bg-white shadow-sm rounded-xl">
+        <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm text-sidebar-accent-foreground">
+            <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
+              <span>🐍</span>
               Generated Keras Code
             </CardTitle>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleCopyCode}
                 disabled={!generatedCode.trim()}
-                className="h-8 px-2"
+                className="h-9 px-3 rounded-lg border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
               >
-                <Copy className="h-3 w-3 mr-1" />
+                <Copy className="h-4 w-4 mr-2" />
                 Copy
               </Button>
               <Button
@@ -96,22 +77,21 @@ export function CodeViewer({ nodes, edges, className = '' }: CodeViewerProps) {
                 size="sm"
                 onClick={handleDownloadCode}
                 disabled={!generatedCode.trim()}
-                className="h-8 px-2"
+                className="h-9 px-3 rounded-lg border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
               >
-                <Download className="h-3 w-3 mr-1" />
+                <Download className="h-4 w-4 mr-2" />
                 Download
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          <div className="rounded-md overflow-hidden border border-sidebar-border">
+          <div className="rounded-xl overflow-hidden border border-slate-200 shadow-inner">
             <div className="text-left">
               <CodeMirror
                 value={generatedCode}
                 height="400px"
                 extensions={[python()]}
-                theme={isDark ? oneDark : undefined}
                 editable={false}
                 style={{ textAlign: 'left' }}
                 basicSetup={{
@@ -132,14 +112,15 @@ export function CodeViewer({ nodes, edges, className = '' }: CodeViewerProps) {
         </CardContent>
       </Card>
 
-      <Card className="border-sidebar-border bg-sidebar-accent/30">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-sidebar-accent-foreground">
-            💡 Code Generation
+      <Card className="border-slate-200 bg-blue-50/50 rounded-xl shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm text-blue-700 flex items-center gap-2">
+            <span>⚡</span>
+            Code Generation
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
-          <p className="text-xs text-sidebar-muted-foreground">
+          <p className="text-xs text-blue-600">
             Connect blocks from Input to Output to generate valid Keras code. 
             The code updates automatically as you modify your network structure.
           </p>
