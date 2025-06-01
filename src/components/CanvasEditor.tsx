@@ -63,44 +63,30 @@ function CanvasEditorInner({
   const [edges, setEdges, onEdgesChangeInternal] = useEdgesState(initialEdges)
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null)
 
-  // Add keyboard listener for global delete functionality
+  // Prevent all delete key functionality
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Delete' || event.key === 'Backspace') {
-        // Only delete if no input element is focused
-        const activeElement = document.activeElement
-        if (activeElement && 
-            (activeElement.tagName === 'INPUT' || 
-             activeElement.tagName === 'TEXTAREA' || 
-             (activeElement as HTMLElement).contentEditable === 'true')) {
-          return
+        // Check if the target is an input element where deletion should be allowed
+        const target = event.target as HTMLElement
+        if (target && (
+          target.tagName === 'INPUT' || 
+          target.tagName === 'TEXTAREA' ||
+          target.contentEditable === 'true'
+        )) {
+          return // Allow deletion in input fields
         }
-
-        const selectedNodes = nodes.filter(node => node.selected)
-        const selectedEdges = edges.filter(edge => edge.selected)
         
-        if (selectedNodes.length > 0 || selectedEdges.length > 0) {
-          event.preventDefault()
-          
-          // Remove selected nodes and edges
-          const newNodes = nodes.filter(node => !node.selected)
-          const newEdges = edges.filter(edge => !edge.selected && 
-            !selectedNodes.some(selectedNode => 
-              edge.source === selectedNode.id || edge.target === selectedNode.id
-            )
-          )
-          
-          setNodes(newNodes)
-          setEdges(newEdges)
-          onNodesChange?.(newNodes)
-          onEdgesChange?.(newEdges)
-        }
+        // Prevent all other delete operations
+        event.preventDefault()
+        event.stopPropagation()
       }
     }
 
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [nodes, edges, setNodes, setEdges, onNodesChange, onEdgesChange])
+    // Add event listener with capture to intercept before ReactFlow
+    document.addEventListener('keydown', handleKeyDown, true)
+    return () => document.removeEventListener('keydown', handleKeyDown, true)
+  }, [])
 
   // Handle connection between nodes
   const onConnect = useCallback(
@@ -208,7 +194,7 @@ function CanvasEditorInner({
         nodeTypes={nodeTypes}
         fitView
         attributionPosition="top-right"
-        deleteKeyCode={['Delete', 'Backspace']}
+        deleteKeyCode={[]}
         multiSelectionKeyCode={['Control', 'Meta']}
       >
         <Controls />

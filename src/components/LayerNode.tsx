@@ -90,13 +90,6 @@ export function LayerNode({ id, data }: LayerNodeProps) {
     setIsOpen(false)
   }
 
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      event.preventDefault()
-      handleDelete()
-    }
-  }
-
   const renderParamEditor = (key: string, value: any) => {
     if (key === 'type' && data.type === 'Activation') {
       return (
@@ -162,7 +155,7 @@ export function LayerNode({ id, data }: LayerNodeProps) {
   }
 
   return (
-    <div className="layer-node" tabIndex={0} onKeyDown={handleKeyDown}>
+    <div className="layer-node">
       {/* Input handle - only show if not Input layer */}
       {type !== 'Input' && (
         <Handle
