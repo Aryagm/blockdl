@@ -4,7 +4,7 @@ import { python } from '@codemirror/lang-python'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Copy, Check } from 'lucide-react'
-import { getOrderedLayers, generateKerasCode } from '../lib/graph-utils'
+import { parseGraphToDAG, generateKerasCode, generateFunctionalKerasCode } from '../lib/graph-utils'
 import type { Node, Edge } from '@xyflow/react'
 
 interface CodeViewerProps {
@@ -16,12 +16,34 @@ interface CodeViewerProps {
 export function CodeViewer({ nodes, edges, className = '' }: CodeViewerProps) {
   const [generatedCode, setGeneratedCode] = useState<string>('')
   const [isCopied, setIsCopied] = useState(false)
+  const [codeType, setCodeType] = useState<'sequential' | 'functional'>('sequential')
 
   // Re-generate code when nodes or edges change
   useEffect(() => {
-    const orderedLayers = getOrderedLayers(nodes, edges)
-    const code = generateKerasCode(orderedLayers)
-    setGeneratedCode(code)
+    const dagResult = parseGraphToDAG(nodes, edges)
+    
+    if (!dagResult.isValid) {
+      setGeneratedCode(`# Error: Invalid network structure\n# ${dagResult.errors.join('\n# ')}`)
+      return
+    }
+    
+    // Determine if we need Functional API (multiple inputs/outputs or complex structure)
+    const hasMultipleInputs = dagResult.orderedNodes.filter(n => n.type === 'Input').length > 1
+    const hasMultipleOutputs = dagResult.orderedNodes.filter(n => n.type === 'Output').length > 1
+    const hasComplexStructure = Array.from(dagResult.edgeMap.values()).some(targets => targets.length > 1)
+    const hasMergeLayer = dagResult.orderedNodes.some(n => n.type === 'Merge')
+    
+    const shouldUseFunctional = hasMultipleInputs || hasMultipleOutputs || hasComplexStructure || hasMergeLayer
+    
+    if (shouldUseFunctional) {
+      setCodeType('functional')
+      const code = generateFunctionalKerasCode(dagResult)
+      setGeneratedCode(code)
+    } else {
+      setCodeType('sequential')
+      const code = generateKerasCode(dagResult.orderedNodes)
+      setGeneratedCode(code)
+    }
   }, [nodes, edges])
 
   const handleCopyCode = async () => {
@@ -53,6 +75,13 @@ export function CodeViewer({ nodes, edges, className = '' }: CodeViewerProps) {
             <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
               <span>🐍</span>
               Generated Keras Code
+              <span className={`text-xs px-2 py-1 rounded-full font-mono ${
+                codeType === 'functional' 
+                  ? 'bg-blue-100 text-blue-700' 
+                  : 'bg-green-100 text-green-700'
+              }`}>
+                {codeType === 'functional' ? 'Functional API' : 'Sequential API'}
+              </span>
             </CardTitle>
             <Button
               variant="outline"

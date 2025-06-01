@@ -7,6 +7,7 @@ import { Label } from './ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Button } from './ui/button'
 import { Trash2 } from 'lucide-react'
+import { getLayerDef, getDefaultParams, getLayerIcon } from '../lib/layer-defs'
 
 interface LayerNodeData {
   type: string
@@ -16,42 +17,6 @@ interface LayerNodeData {
 interface LayerNodeProps {
   id: string
   data: LayerNodeData
-}
-
-// Default parameters for each layer type
-const getDefaultParams = (type: string): Record<string, any> => {
-  switch (type) {
-    case 'Dense':
-      return { units: 128 }
-    case 'Activation':
-      return { type: 'relu' }
-    case 'Dropout':
-      return { rate: 0.2 }
-    case 'Input':
-      return { shape: '(784,)' }
-    case 'Output':
-      return { units: 10, activation: 'softmax' }
-    default:
-      return {}
-  }
-}
-
-// Get icon for each layer type
-const getLayerIcon = (type: string): string => {
-  switch (type) {
-    case 'Input':
-      return '📥'
-    case 'Dense':
-      return '🔗'
-    case 'Activation':
-      return '⚡'
-    case 'Dropout':
-      return '🎲'
-    case 'Output':
-      return '📤'
-    default:
-      return '⚙️'
-  }
 }
 
 // Format params for display
@@ -67,6 +32,7 @@ export function LayerNode({ id, data }: LayerNodeProps) {
   const { updateNodeData, deleteElements } = useReactFlow()
   
   const { type, params = getDefaultParams(data.type) } = data
+  const layerDef = getLayerDef(type)
   const icon = getLayerIcon(type)
   const formattedParams = formatParams(params)
 
@@ -90,45 +56,26 @@ export function LayerNode({ id, data }: LayerNodeProps) {
     setIsOpen(false)
   }
 
-  const renderParamEditor = (key: string, value: any) => {
-    if (key === 'type' && data.type === 'Activation') {
-      return (
-        <div key={key} className="space-y-1">
-          <Label htmlFor={key} className="text-xs">{key}</Label>
-          <Select
-            value={editParams[key]?.toString() || ''}
-            onValueChange={(newValue) => setEditParams({ ...editParams, [key]: newValue })}
-          >
-            <SelectTrigger className="h-8">
-              <SelectValue placeholder="Select activation" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="relu">ReLU</SelectItem>
-              <SelectItem value="sigmoid">Sigmoid</SelectItem>
-              <SelectItem value="tanh">Tanh</SelectItem>
-              <SelectItem value="softmax">Softmax</SelectItem>
-              <SelectItem value="linear">Linear</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )
-    }
+  const renderParamEditor = (field: any) => {
+    const { key, label, type, options, min, max, step } = field
 
-    if (key === 'activation' && data.type === 'Output') {
+    if (type === 'select') {
       return (
         <div key={key} className="space-y-1">
-          <Label htmlFor={key} className="text-xs">{key}</Label>
+          <Label htmlFor={key} className="text-xs">{label}</Label>
           <Select
             value={editParams[key]?.toString() || ''}
             onValueChange={(newValue) => setEditParams({ ...editParams, [key]: newValue })}
           >
             <SelectTrigger className="h-8">
-              <SelectValue placeholder="Select activation" />
+              <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="softmax">Softmax</SelectItem>
-              <SelectItem value="sigmoid">Sigmoid</SelectItem>
-              <SelectItem value="linear">Linear</SelectItem>
+              {options?.map((option: { value: string; label: string }) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -137,13 +84,16 @@ export function LayerNode({ id, data }: LayerNodeProps) {
 
     return (
       <div key={key} className="space-y-1">
-        <Label htmlFor={key} className="text-xs">{key}</Label>
+        <Label htmlFor={key} className="text-xs">{label}</Label>
         <Input
           id={key}
-          type={typeof value === 'number' ? 'number' : 'text'}
+          type={type}
           value={editParams[key]?.toString() || ''}
+          min={min}
+          max={max}
+          step={step}
           onChange={(e) => {
-            const newValue = typeof value === 'number' ? 
+            const newValue = type === 'number' ? 
               (e.target.value === '' ? '' : Number(e.target.value)) : 
               e.target.value
             setEditParams({ ...editParams, [key]: newValue })
@@ -216,8 +166,8 @@ export function LayerNode({ id, data }: LayerNodeProps) {
             </div>
             
             <div className="space-y-3">
-              {Object.entries(editParams).map(([key, value]) => 
-                renderParamEditor(key, value)
+              {layerDef?.formSpec.map((field) => 
+                renderParamEditor(field)
               )}
             </div>
             

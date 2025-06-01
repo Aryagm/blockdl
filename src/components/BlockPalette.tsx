@@ -1,12 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { getLayerTypes } from '../lib/layer-defs'
 
-const layerTypes = [
-  { type: 'Input', icon: '📥', description: 'Input layer for data' },
-  { type: 'Dense', icon: '🔗', description: 'Fully connected layer' },
-  { type: 'Activation', icon: '⚡', description: 'Activation function' },
-  { type: 'Dropout', icon: '🎲', description: 'Regularization layer' },
-  { type: 'Output', icon: '📤', description: 'Output layer' },
-]
+const layerTypes = getLayerTypes()
 
 interface BlockPaletteProps {
   className?: string

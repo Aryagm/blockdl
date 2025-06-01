@@ -18,7 +18,8 @@ import type {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { LayerNode } from './LayerNode'
-import { getOrderedLayers, validateNetworkStructure } from '../lib/graph-utils'
+import { parseGraphToDAG, validateNetworkStructure } from '../lib/graph-utils'
+import { getDefaultParams } from '../lib/layer-defs'
 
 // Initial nodes and edges - start with empty canvas
 const initialNodes: Node[] = []
@@ -28,24 +29,6 @@ const initialEdges: Edge[] = []
 // Custom node types can be defined here
 const nodeTypes: NodeTypes = {
   layerNode: LayerNode,
-}
-
-// Default parameters for each layer type
-const getDefaultParams = (type: string): Record<string, any> => {
-  switch (type) {
-    case 'Dense':
-      return { units: 128 }
-    case 'Activation':
-      return { type: 'relu' }
-    case 'Dropout':
-      return { rate: 0.2 }
-    case 'Input':
-      return { shape: '(784,)' }
-    case 'Output':
-      return { units: 10, activation: 'softmax' }
-    default:
-      return {}
-  }
 }
 
 interface CanvasEditorProps {
@@ -106,13 +89,16 @@ function CanvasEditorInner({
       // Get updated nodes after changes are applied
       const updatedNodes = nodes // This will be updated on next render
       
-      // Validate network structure and get ordered layers
-      const orderedLayers = getOrderedLayers(updatedNodes, edges)
+      // Validate network structure and get DAG information
+      const dagResult = parseGraphToDAG(updatedNodes, edges)
       const validation = validateNetworkStructure(updatedNodes, edges)
       
       console.log('Network validation:', validation)
-      if (orderedLayers.length > 0) {
-        console.log('Ordered layers:', orderedLayers)
+      if (dagResult.isValid) {
+        console.log('DAG structure:', {
+          nodeCount: dagResult.orderedNodes.length,
+          hasComplexStructure: Array.from(dagResult.edgeMap.values()).some(targets => targets.length > 1)
+        })
       }
       
       onNodesChange?.(updatedNodes)
@@ -126,12 +112,15 @@ function CanvasEditorInner({
       onEdgesChangeInternal(changes)
       
       // Validate network structure when edges change
-      const orderedLayers = getOrderedLayers(nodes, edges)
+      const dagResult = parseGraphToDAG(nodes, edges)
       const validation = validateNetworkStructure(nodes, edges)
       
       console.log('Network validation (edges changed):', validation)
-      if (orderedLayers.length > 0) {
-        console.log('Ordered layers (edges changed):', orderedLayers)
+      if (dagResult.isValid) {
+        console.log('DAG structure (edges changed):', {
+          nodeCount: dagResult.orderedNodes.length,
+          hasComplexStructure: Array.from(dagResult.edgeMap.values()).some(targets => targets.length > 1)
+        })
       }
       
       onEdgesChange?.(edges)

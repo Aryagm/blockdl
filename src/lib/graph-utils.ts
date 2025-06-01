@@ -1,25 +1,41 @@
 import type { Node, Edge } from '@xyflow/react'
+import { generateLayerCode, getKerasImports } from './layer-defs'
 
 export interface LayerObject {
   id: string
   type: string
   params: Record<string, any>
+  varName: string
+}
+
+export interface DAGResult {
+  orderedNodes: LayerObject[]
+  edgeMap: Map<string, string[]>
+  isValid: boolean
+  errors: string[]
 }
 
 /**
- * Returns an array of layer objects topologically sorted (assumes single linear path).
- * Validates that first node is 'Input' and last is 'Output'; returns [] if invalid.
+ * Parses a graph into a DAG structure with unique variable names for code generation.
+ * Returns ordered nodes, edge map, and validation information.
  */
-export function getOrderedLayers(nodes: Node[], edges: Edge[]): LayerObject[] {
+export function parseGraphToDAG(nodes: Node[], edges: Edge[]): DAGResult {
+  const errors: string[] = []
+  
   if (nodes.length === 0) {
-    return []
+    return {
+      orderedNodes: [],
+      edgeMap: new Map(),
+      isValid: false,
+      errors: ['Network must have at least one layer']
+    }
   }
 
   // Convert nodes to a map for easy lookup
   const nodeMap = new Map<string, Node>()
   nodes.forEach(node => nodeMap.set(node.id, node))
 
-  // Build adjacency list for outgoing edges
+  // Build adjacency lists
   const outgoing = new Map<string, string[]>()
   const incoming = new Map<string, string[]>()
   
@@ -40,167 +56,195 @@ export function getOrderedLayers(nodes: Node[], edges: Edge[]): LayerObject[] {
     incoming.set(edge.target, targetConnections)
   })
 
-  // Find the start node (node with no incoming edges)
-  const startNodes = nodes.filter(node => {
+  // Find input nodes (nodes with no incoming edges)
+  const inputNodes = nodes.filter(node => {
     const incomingEdges = incoming.get(node.id) || []
     return incomingEdges.length === 0
   })
 
-  // Find the end node (node with no outgoing edges)
-  const endNodes = nodes.filter(node => {
+  // Find output nodes (nodes with no outgoing edges)
+  const outputNodes = nodes.filter(node => {
     const outgoingEdges = outgoing.get(node.id) || []
     return outgoingEdges.length === 0
   })
 
-  // Validate structure: should have exactly one start and one end node
-  if (startNodes.length !== 1 || endNodes.length !== 1) {
-    return []
+  // Validate input/output structure
+  if (inputNodes.length === 0) {
+    errors.push('Network must have at least one Input layer')
+  }
+  if (outputNodes.length === 0) {
+    errors.push('Network must have at least one Output layer')
   }
 
-  const startNode = startNodes[0]
-  const endNode = endNodes[0]
-
-  // Validate that first node is 'Input' and last is 'Output'
-  if ((startNode.data as any).type !== 'Input' || (endNode.data as any).type !== 'Output') {
-    return []
-  }
-
-  // Perform topological sort using DFS
-  const result: LayerObject[] = []
+  // Check for cycles using DFS
   const visited = new Set<string>()
-
-  function dfs(nodeId: string): boolean {
+  const recursionStack = new Set<string>()
+  
+  function hasCycle(nodeId: string): boolean {
+    if (recursionStack.has(nodeId)) {
+      return true // Back edge found - cycle detected
+    }
     if (visited.has(nodeId)) {
-      // Cycle detected
-      return false
+      return false // Already processed
     }
 
     visited.add(nodeId)
-    const node = nodeMap.get(nodeId)
-    
-    if (!node) {
-      return false
-    }
+    recursionStack.add(nodeId)
 
-    // Add current node to result
-    result.push({
-      id: node.id,
-      type: (node.data as any).type as string,
-      params: (node.data as any).params || {}
-    })
-
-    // Visit all outgoing nodes
-    const nextNodes = outgoing.get(nodeId) || []
-    
-    // For linear path validation, each node should have at most one outgoing edge
-    if (nextNodes.length > 1) {
-      return false
-    }
-
-    for (const nextNodeId of nextNodes) {
-      if (!dfs(nextNodeId)) {
-        return false
+    const neighbors = outgoing.get(nodeId) || []
+    for (const neighbor of neighbors) {
+      if (hasCycle(neighbor)) {
+        return true
       }
     }
 
-    return true
+    recursionStack.delete(nodeId)
+    return false
   }
 
-  // Start DFS from the start node
-  const success = dfs(startNode.id)
+  // Check for cycles starting from all unvisited nodes
+  for (const node of nodes) {
+    if (!visited.has(node.id) && hasCycle(node.id)) {
+      errors.push('Network contains cycles - DAG structure required')
+      break
+    }
+  }
+
+  // If there are validation errors, return early
+  if (errors.length > 0) {
+    return {
+      orderedNodes: [],
+      edgeMap: new Map(),
+      isValid: false,
+      errors
+    }
+  }
+
+  // Perform topological sort using Kahn's algorithm
+  const orderedNodes: LayerObject[] = []
+  const inDegree = new Map<string, number>()
+  const queue: string[] = []
   
-  if (!success) {
-    return []
+  // Initialize in-degree count
+  nodes.forEach(node => {
+    const incomingEdges = incoming.get(node.id) || []
+    inDegree.set(node.id, incomingEdges.length)
+    if (incomingEdges.length === 0) {
+      queue.push(node.id)
+    }
+  })
+
+  // Generate unique variable names
+  const typeCounters = new Map<string, number>()
+  
+  function generateVarName(type: string): string {
+    const counter = typeCounters.get(type) || 0
+    typeCounters.set(type, counter + 1)
+    
+    if (counter === 0) {
+      return type.toLowerCase()
+    }
+    return `${type.toLowerCase()}_${counter}`
   }
 
-  // Validate that we visited all nodes (ensures single connected component)
-  if (result.length !== nodes.length) {
-    return []
-  }
+  // Process nodes in topological order
+  while (queue.length > 0) {
+    const nodeId = queue.shift()!
+    const node = nodeMap.get(nodeId)!
+    
+    // Create layer object with unique variable name
+    const layerObject: LayerObject = {
+      id: node.id,
+      type: (node.data as any).type,
+      params: (node.data as any).params || {},
+      varName: generateVarName((node.data as any).type)
+    }
+    
+    orderedNodes.push(layerObject)
 
-  // Additional validation: ensure linear path
-  // Each node (except the last) should have exactly one outgoing edge
-  // Each node (except the first) should have exactly one incoming edge
-  for (let i = 0; i < result.length; i++) {
-    const nodeId = result[i].id
-    const incomingEdges = incoming.get(nodeId) || []
-    const outgoingEdges = outgoing.get(nodeId) || []
-
-    if (i === 0) {
-      // First node should have no incoming edges and exactly one outgoing edge (unless it's the only node)
-      if (incomingEdges.length !== 0 || (result.length > 1 && outgoingEdges.length !== 1)) {
-        return []
-      }
-    } else if (i === result.length - 1) {
-      // Last node should have exactly one incoming edge and no outgoing edges
-      if (incomingEdges.length !== 1 || outgoingEdges.length !== 0) {
-        return []
-      }
-    } else {
-      // Middle nodes should have exactly one incoming and one outgoing edge
-      if (incomingEdges.length !== 1 || outgoingEdges.length !== 1) {
-        return []
+    // Update in-degrees of neighboring nodes
+    const neighbors = outgoing.get(nodeId) || []
+    for (const neighbor of neighbors) {
+      const currentInDegree = inDegree.get(neighbor)!
+      inDegree.set(neighbor, currentInDegree - 1)
+      
+      if (currentInDegree - 1 === 0) {
+        queue.push(neighbor)
       }
     }
   }
 
-  return result
+  // Verify all nodes were processed (no cycles)
+  if (orderedNodes.length !== nodes.length) {
+    errors.push('Unable to create topological ordering - network may contain cycles')
+    return {
+      orderedNodes: [],
+      edgeMap: new Map(),
+      isValid: false,
+      errors
+    }
+  }
+
+  return {
+    orderedNodes,
+    edgeMap: outgoing,
+    isValid: true,
+    errors: []
+  }
 }
 
 /**
- * Validates if the current graph structure represents a valid neural network
+ * Legacy function for backward compatibility - returns only ordered layers for linear paths
+ */
+export function getOrderedLayers(nodes: Node[], edges: Edge[]): LayerObject[] {
+  const result = parseGraphToDAG(nodes, edges)
+  
+  // For backward compatibility, only return ordered nodes if it's a valid linear path
+  if (!result.isValid) {
+    return []
+  }
+  
+  // Check if it's a linear path (each node has at most one outgoing connection)
+  for (const [_nodeId, targets] of result.edgeMap.entries()) {
+    if (targets.length > 1) {
+      return [] // Not a linear path
+    }
+  }
+  
+  return result.orderedNodes
+}
+
+/**
+ * Validates if the current graph structure represents a valid neural network DAG
  */
 export function validateNetworkStructure(nodes: Node[], edges: Edge[]): {
   isValid: boolean
   errors: string[]
 } {
-  const errors: string[] = []
-
-  if (nodes.length === 0) {
-    errors.push('Network must have at least one layer')
-    return { isValid: false, errors }
+  const result = parseGraphToDAG(nodes, edges)
+  return {
+    isValid: result.isValid,
+    errors: result.errors
   }
-
-  const orderedLayers = getOrderedLayers(nodes, edges)
-  
-  if (orderedLayers.length === 0) {
-    errors.push('Invalid network structure')
-    
-    // More specific error checking
-    const inputNodes = nodes.filter(node => (node.data as any).type === 'Input')
-    const outputNodes = nodes.filter(node => (node.data as any).type === 'Output')
-    
-    if (inputNodes.length === 0) {
-      errors.push('Network must have exactly one Input layer')
-    } else if (inputNodes.length > 1) {
-      errors.push('Network must have exactly one Input layer')
-    }
-    
-    if (outputNodes.length === 0) {
-      errors.push('Network must have exactly one Output layer')
-    } else if (outputNodes.length > 1) {
-      errors.push('Network must have exactly one Output layer')
-    }
-    
-    return { isValid: false, errors }
-  }
-
-  return { isValid: true, errors: [] }
 }
 
 /**
- * Generates Keras/TensorFlow Python code from ordered layers
+ * Generates Keras/TensorFlow Python code from a DAG structure
  */
 export function generateKerasCode(layers: LayerObject[]): string {
   if (layers.length === 0) {
     return '# No layers to generate code for'
   }
 
-  // Generate imports
+  // For now, we'll generate Sequential model code for backward compatibility
+  // TODO: Add support for Functional API for complex DAG structures
+  
+  // Generate imports using the centralized function
+  const kerasImports = getKerasImports()
   const imports = [
     'import tensorflow as tf',
     'from tensorflow.keras.models import Sequential',
-    'from tensorflow.keras.layers import Dense, Activation, Dropout, Input'
+    `from tensorflow.keras.layers import ${kerasImports.join(', ')}`
   ]
 
   // Generate model creation
@@ -208,7 +252,7 @@ export function generateKerasCode(layers: LayerObject[]): string {
 
   // Generate layer code
   layers.forEach((layer) => {
-    const layerCode = generateLayerCode(layer)
+    const layerCode = generateLayerCode(layer.type, layer.params)
     if (layerCode) {
       modelLines.push(`    ${layerCode},`)
     }
@@ -234,35 +278,117 @@ export function generateKerasCode(layers: LayerObject[]): string {
 }
 
 /**
- * Generates code for a single layer
+ * Generates Keras Functional API code for complex DAG structures
  */
-function generateLayerCode(layer: LayerObject): string {
-  const { type, params } = layer
-
-  switch (type) {
-    case 'Input':
-      // Input layer is handled differently in Keras Sequential
-      return `Input(shape=${params.shape || '(784,)'})`
-
-    case 'Dense':
-      const units = params.units || 128
-      const activation = params.activation ? `, activation='${params.activation}'` : ''
-      return `Dense(${units}${activation})`
-
-    case 'Activation':
-      const activationType = params.type || 'relu'
-      return `Activation('${activationType}')`
-
-    case 'Dropout':
-      const rate = params.rate || 0.2
-      return `Dropout(${rate})`
-
-    case 'Output':
-      const outputUnits = params.units || 10
-      const outputActivation = params.activation ? `, activation='${params.activation}'` : ''
-      return `Dense(${outputUnits}${outputActivation})`
-
-    default:
-      return `# Unknown layer type: ${type}`
+export function generateFunctionalKerasCode(dagResult: DAGResult): string {
+  if (!dagResult.isValid || dagResult.orderedNodes.length === 0) {
+    return '# Invalid DAG structure - cannot generate code'
   }
+
+  const { orderedNodes, edgeMap } = dagResult
+
+  // Generate imports
+  const kerasImports = getKerasImports()
+  const imports = [
+    'import tensorflow as tf',
+    'from tensorflow.keras.models import Model',
+    'from tensorflow.keras.layers import Input',
+    `from tensorflow.keras.layers import ${kerasImports.filter(imp => imp !== 'Input').join(', ')}`
+  ]
+
+  const codeLines: string[] = [...imports, '']
+
+  // Track variable assignments
+  const layerVariables = new Map<string, string>()
+
+  // Generate layer definitions
+  orderedNodes.forEach((layer) => {
+    const { id, type, params, varName } = layer
+    
+    if (type === 'Input') {
+      // Handle input layers
+      const shape = params.shape || '(784,)'
+      codeLines.push(`${varName} = Input(shape=${shape})`)
+      layerVariables.set(id, varName)
+    } else {
+      // Handle other layers
+      const layerCode = generateLayerCode(type, params)
+      const inputNodes = []
+      
+      // Find input connections for this layer
+      for (const [sourceId, targets] of edgeMap.entries()) {
+        if (targets.includes(id)) {
+          const inputVar = layerVariables.get(sourceId)
+          if (inputVar) {
+            inputNodes.push(inputVar)
+          }
+        }
+      }
+      
+      if (inputNodes.length === 0) {
+        codeLines.push(`# Warning: ${varName} has no inputs`)
+        codeLines.push(`${varName} = ${layerCode}`)
+      } else if (inputNodes.length === 1) {
+        codeLines.push(`${varName} = ${layerCode}(${inputNodes[0]})`)
+      } else {
+        // Multiple inputs - might need merge layer
+        if (type === 'Merge') {
+          codeLines.push(`${varName} = ${layerCode}([${inputNodes.join(', ')}])`)
+        } else {
+          codeLines.push(`${varName} = ${layerCode}([${inputNodes.join(', ')}])`)
+        }
+      }
+      
+      layerVariables.set(id, varName)
+    }
+  })
+
+  // Find output nodes
+  const outputVars: string[] = []
+  orderedNodes.forEach((layer) => {
+    const hasOutgoing = edgeMap.has(layer.id) && edgeMap.get(layer.id)!.length > 0
+    if (!hasOutgoing) {
+      const outputVar = layerVariables.get(layer.id)
+      if (outputVar) {
+        outputVars.push(outputVar)
+      }
+    }
+  })
+
+  // Find input nodes
+  const inputVars: string[] = []
+  orderedNodes.forEach((layer) => {
+    if (layer.type === 'Input') {
+      const inputVar = layerVariables.get(layer.id)
+      if (inputVar) {
+        inputVars.push(inputVar)
+      }
+    }
+  })
+
+  // Generate model creation
+  codeLines.push('')
+  if (inputVars.length === 1 && outputVars.length === 1) {
+    codeLines.push(`model = Model(inputs=${inputVars[0]}, outputs=${outputVars[0]})`)
+  } else {
+    const inputsStr = inputVars.length === 1 ? inputVars[0] : `[${inputVars.join(', ')}]`
+    const outputsStr = outputVars.length === 1 ? outputVars[0] : `[${outputVars.join(', ')}]`
+    codeLines.push(`model = Model(inputs=${inputsStr}, outputs=${outputsStr})`)
+  }
+
+  // Generate compilation and summary
+  const compilationLines: string[] = [
+    '',
+    '# Compile the model',
+    'model.compile(',
+    "    optimizer='adam',",
+    "    loss='categorical_crossentropy',",
+    "    metrics=['accuracy']",
+    ')',
+    '',
+    '# Display model summary',
+    'model.summary()'
+  ]
+
+  return [...codeLines, ...compilationLines].join('\n')
 }
