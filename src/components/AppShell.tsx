@@ -56,7 +56,7 @@ export function AppShell({
       </div>
 
       {/* Right Sidebar - Code Viewer */}
-      <div className="w-96 bg-white border-l border-slate-200 flex-shrink-0 shadow-sm">
+      <div className="w-[500px] bg-white border-l border-slate-200 flex-shrink-0 shadow-sm">
         <div className="h-full overflow-hidden">
           {codeViewer || (
             <div className="p-6">

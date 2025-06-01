@@ -3,7 +3,7 @@ import CodeMirror from '@uiw/react-codemirror'
 import { python } from '@codemirror/lang-python'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Copy, Download } from 'lucide-react'
+import { Copy, Check } from 'lucide-react'
 import { getOrderedLayers, generateKerasCode } from '../lib/graph-utils'
 import type { Node, Edge } from '@xyflow/react'
 
@@ -15,6 +15,7 @@ interface CodeViewerProps {
 
 export function CodeViewer({ nodes, edges, className = '' }: CodeViewerProps) {
   const [generatedCode, setGeneratedCode] = useState<string>('')
+  const [isCopied, setIsCopied] = useState(false)
 
   // Re-generate code when nodes or edges change
   useEffect(() => {
@@ -26,7 +27,9 @@ export function CodeViewer({ nodes, edges, className = '' }: CodeViewerProps) {
   const handleCopyCode = async () => {
     try {
       await navigator.clipboard.writeText(generatedCode)
-      // You could add a toast notification here
+      setIsCopied(true)
+      // Reset the confirmation after 2 seconds
+      setTimeout(() => setIsCopied(false), 2000)
       console.log('Code copied to clipboard!')
     } catch (err) {
       console.error('Failed to copy code:', err)
@@ -37,19 +40,9 @@ export function CodeViewer({ nodes, edges, className = '' }: CodeViewerProps) {
       textArea.select()
       document.execCommand('copy')
       document.body.removeChild(textArea)
+      setIsCopied(true)
+      setTimeout(() => setIsCopied(false), 2000)
     }
-  }
-
-  const handleDownloadCode = () => {
-    const blob = new Blob([generatedCode], { type: 'text/python' })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = 'neural_network.py'
-    document.body.appendChild(anchor)
-    anchor.click()
-    document.body.removeChild(anchor)
-    URL.revokeObjectURL(url)
   }
 
   return (
@@ -61,28 +54,29 @@ export function CodeViewer({ nodes, edges, className = '' }: CodeViewerProps) {
               <span>🐍</span>
               Generated Keras Code
             </CardTitle>
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopyCode}
-                disabled={!generatedCode.trim()}
-                className="h-9 px-3 rounded-lg border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                Copy
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownloadCode}
-                disabled={!generatedCode.trim()}
-                className="h-9 px-3 rounded-lg border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyCode}
+              disabled={!generatedCode.trim()}
+              className={`h-9 px-4 rounded-lg transition-all duration-200 shadow-sm ${
+                isCopied 
+                  ? 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100' 
+                  : 'border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+              }`}
+            >
+              {isCopied ? (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy Code
+                </>
+              )}
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
