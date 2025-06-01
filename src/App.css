@@ -3,6 +3,16 @@
   position: relative;
 }
 
+/* Delete button styling for layer nodes */
+.layer-node .delete-button {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.layer-node:hover .delete-button {
+  opacity: 1;
+}
+
 /* Remove any default styling that might interfere */
 #root {
   margin: 0;
@@ -27,4 +37,10 @@
 
 .layer-node .react-flow__handle-bottom {
   bottom: -6px;
+}
+
+/* Node selection styling */
+.react-flow__node.selected .layer-node {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
 }

@@ -61,6 +61,7 @@ export function BlockPalette({ className = '' }: BlockPaletteProps) {
         <CardContent className="pt-0">
           <p className="text-xs text-blue-600">
             Drag and drop blocks onto the canvas to build your neural network architecture.
+            Click the trash icon or press Delete/Backspace to remove blocks.
           </p>
         </CardContent>
       </Card>

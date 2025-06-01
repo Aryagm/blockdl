@@ -6,6 +6,7 @@ import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Button } from './ui/button'
+import { Trash2 } from 'lucide-react'
 
 interface LayerNodeData {
   type: string
@@ -63,7 +64,7 @@ const formatParams = (params: Record<string, any>): string => {
 export function LayerNode({ id, data }: LayerNodeProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [editParams, setEditParams] = useState(data.params || getDefaultParams(data.type))
-  const { updateNodeData } = useReactFlow()
+  const { updateNodeData, deleteElements } = useReactFlow()
   
   const { type, params = getDefaultParams(data.type) } = data
   const icon = getLayerIcon(type)
@@ -82,6 +83,18 @@ export function LayerNode({ id, data }: LayerNodeProps) {
   const handleCancel = () => {
     setEditParams({ ...params })
     setIsOpen(false)
+  }
+
+  const handleDelete = () => {
+    deleteElements({ nodes: [{ id }] })
+    setIsOpen(false)
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault()
+      handleDelete()
+    }
   }
 
   const renderParamEditor = (key: string, value: any) => {
@@ -149,7 +162,7 @@ export function LayerNode({ id, data }: LayerNodeProps) {
   }
 
   return (
-    <div className="layer-node">
+    <div className="layer-node" tabIndex={0} onKeyDown={handleKeyDown}>
       {/* Input handle - only show if not Input layer */}
       {type !== 'Input' && (
         <Handle
@@ -161,26 +174,40 @@ export function LayerNode({ id, data }: LayerNodeProps) {
       
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
-          <Card 
-            className="min-w-[160px] shadow-md border-2 hover:shadow-xl hover:shadow-blue-200/50 transition-all duration-300 cursor-pointer bg-white hover:bg-slate-50 rounded-xl border-slate-200 hover:border-blue-300 hover:scale-[1.02] group"
-            onDoubleClick={handleDoubleClick}
-          >
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-3">
-                <span className="text-lg group-hover:scale-110 transition-transform duration-200">{icon}</span>
-                <span className="font-semibold text-slate-700">{type}</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="text-xs text-slate-500">
-                {formattedParams && (
-                  <div className="bg-slate-100 rounded-lg px-3 py-2 font-mono text-slate-600">
-                    {formattedParams}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="relative group">
+            {/* Delete button - positioned absolutely in top-right corner */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDelete()
+              }}
+              className="absolute -top-2 -right-2 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg hover:shadow-xl hover:scale-110"
+              title="Delete this block"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+            
+            <Card 
+              className="min-w-[160px] shadow-md border-2 hover:shadow-xl hover:shadow-blue-200/50 transition-all duration-300 cursor-pointer bg-white hover:bg-slate-50 rounded-xl border-slate-200 hover:border-blue-300 hover:scale-[1.02]"
+              onDoubleClick={handleDoubleClick}
+            >
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-3">
+                  <span className="text-lg group-hover:scale-110 transition-transform duration-200">{icon}</span>
+                  <span className="font-semibold text-slate-700">{type}</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-xs text-slate-500">
+                  {formattedParams && (
+                    <div className="bg-slate-100 rounded-lg px-3 py-2 font-mono text-slate-600">
+                      {formattedParams}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </PopoverTrigger>
         
         <PopoverContent className="w-80" side="right" align="start">
