@@ -21,6 +21,17 @@ export interface LayerDef {
   formSpec: LayerFormField[]
   codeGen: (params: Record<string, any>) => string
   kerasImport?: string
+  supportsMultiplier?: boolean  // New property to indicate if layer supports multiplier
+}
+
+export interface LayerDef {
+  type: string
+  icon: string
+  description: string
+  defaultParams: Record<string, any>
+  formSpec: LayerFormField[]
+  codeGen: (params: Record<string, any>) => string
+  kerasImport?: string
 }
 
 export const layerDefs: Record<string, LayerDef> = {
@@ -77,7 +88,7 @@ export const layerDefs: Record<string, LayerDef> = {
     type: 'Dense',
     icon: '🔗',
     description: 'Fully connected layer',
-    defaultParams: { units: 128 },
+    defaultParams: { units: 128, multiplier: 1 },
     formSpec: [
       {
         key: 'units',
@@ -97,14 +108,35 @@ export const layerDefs: Record<string, LayerDef> = {
           { value: 'softmax', label: 'Softmax' },
           { value: 'linear', label: 'Linear' }
         ]
+      },
+      {
+        key: 'multiplier',
+        label: 'Repeat (x times)',
+        type: 'number',
+        min: 1,
+        max: 20
       }
     ],
     codeGen: (params) => {
       const units = params.units || 128
       const activation = params.activation && params.activation !== 'none' ? `, activation='${params.activation}'` : ''
-      return `Dense(${units}${activation})`
+      const multiplier = params.multiplier || 1
+      
+      const layerCode = `Dense(${units}${activation})`
+      
+      if (multiplier === 1) {
+        return layerCode
+      } else if (multiplier <= 5) {
+        // For small multipliers, generate individual layers
+        return Array(multiplier).fill(layerCode).join(',\n    ')
+      } else {
+        // For large multipliers, use a loop for cleaner code
+        return `# Add ${multiplier} Dense layers with ${units} units${activation ? ` and ${params.activation} activation` : ''}
+*[${layerCode} for _ in range(${multiplier})]`
+      }
     },
-    kerasImport: 'Dense'
+    kerasImport: 'Dense',
+    supportsMultiplier: true
   },
 
   // =============== CONVOLUTIONAL LAYERS ===============
@@ -116,7 +148,8 @@ export const layerDefs: Record<string, LayerDef> = {
       filters: 32, 
       kernel_size: '(3,3)', 
       strides: '(1,1)', 
-      padding: 'same' 
+      padding: 'same',
+      multiplier: 1
     },
     formSpec: [
       {
@@ -143,6 +176,13 @@ export const layerDefs: Record<string, LayerDef> = {
           { value: 'valid', label: 'Valid' },
           { value: 'same', label: 'Same' }
         ]
+      },
+      {
+        key: 'multiplier',
+        label: 'Repeat (x times)',
+        type: 'number',
+        min: 1,
+        max: 10
       }
     ],
     codeGen: (params) => {
@@ -150,9 +190,23 @@ export const layerDefs: Record<string, LayerDef> = {
       const kernel_size = params.kernel_size || '(3,3)'
       const strides = params.strides || '(1,1)'
       const padding = params.padding || 'same'
-      return `Conv2D(${filters}, kernel_size=${kernel_size}, strides=${strides}, padding='${padding}')`
+      const multiplier = params.multiplier || 1
+      
+      const layerCode = `Conv2D(${filters}, kernel_size=${kernel_size}, strides=${strides}, padding='${padding}')`
+      
+      if (multiplier === 1) {
+        return layerCode
+      } else if (multiplier <= 5) {
+        // For small multipliers, generate individual layers
+        return Array(multiplier).fill(layerCode).join(',\n    ')
+      } else {
+        // For large multipliers, use a loop for cleaner code
+        return `# Add ${multiplier} Conv2D layers with ${filters} filters
+*[${layerCode} for _ in range(${multiplier})]`
+      }
     },
-    kerasImport: 'Conv2D'
+    kerasImport: 'Conv2D',
+    supportsMultiplier: true
   },
 
   Conv2DTranspose: {
@@ -369,7 +423,8 @@ export const layerDefs: Record<string, LayerDef> = {
     description: 'Long Short-Term Memory layer',
     defaultParams: { 
       units: 128, 
-      return_sequences: false 
+      return_sequences: false,
+      multiplier: 1
     },
     formSpec: [
       {
@@ -386,14 +441,35 @@ export const layerDefs: Record<string, LayerDef> = {
           { value: 'false', label: 'False' },
           { value: 'true', label: 'True' }
         ]
+      },
+      {
+        key: 'multiplier',
+        label: 'Repeat (x times)',
+        type: 'number',
+        min: 1,
+        max: 10
       }
     ],
     codeGen: (params) => {
       const units = params.units || 128
       const return_sequences = params.return_sequences === 'true' || params.return_sequences === true
-      return `LSTM(${units}, return_sequences=${return_sequences})`
+      const multiplier = params.multiplier || 1
+      
+      const layerCode = `LSTM(${units}, return_sequences=${return_sequences})`
+      
+      if (multiplier === 1) {
+        return layerCode
+      } else if (multiplier <= 5) {
+        // For small multipliers, generate individual layers
+        return Array(multiplier).fill(layerCode).join(',\n    ')
+      } else {
+        // For large multipliers, use a loop for cleaner code
+        return `# Add ${multiplier} LSTM layers with ${units} units
+*[${layerCode} for _ in range(${multiplier})]`
+      }
     },
-    kerasImport: 'LSTM'
+    kerasImport: 'LSTM',
+    supportsMultiplier: true
   },
 
   GRU: {

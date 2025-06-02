@@ -139,6 +139,7 @@ export function LayerNode({ id, data }: LayerNodeProps) {
   if (params.activation && params.activation !== 'linear') visibleParams.push(params.activation)
   if (params.rate) visibleParams.push(`rate: ${params.rate}`)
   if (params.size) visibleParams.push(`size: ${params.size}`)
+  // Note: multiplier is shown as a badge in the header, no need to show it here again
 
   return (
     <div className="layer-node">
@@ -185,6 +186,12 @@ export function LayerNode({ id, data }: LayerNodeProps) {
                 <span className={`font-semibold text-sm truncate ${hasShapeError ? 'text-red-700' : 'text-slate-700'}`}>
                   {type}
                 </span>
+                {/* Multiplier badge */}
+                {params.multiplier && params.multiplier > 1 && (
+                  <span className="bg-indigo-500 text-white text-xs px-1.5 py-0.5 rounded-full font-bold flex-shrink-0" title={`This layer will be repeated ${params.multiplier} times`}>
+                    ×{params.multiplier}
+                  </span>
+                )}
                 {hasShapeError && (
                   <span className="text-red-500 text-sm font-bold flex-shrink-0" title={`Shape Error: ${shapeErrorMessage}`}>
                     ⚠️

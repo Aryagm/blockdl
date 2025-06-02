@@ -260,7 +260,37 @@ export function generateKerasCode(layers: LayerObject[]): string {
   layers.forEach((layer) => {
     const layerCode = generateLayerCode(layer.type, layer.params)
     if (layerCode) {
-      modelLines.push(`    ${layerCode},`)
+      // Handle multi-line layer code (for multiplier > 5)
+      const lines = layerCode.split('\n')
+      if (lines.length > 1) {
+        // Multi-line code: add comment first, then the layer code
+        lines.forEach((line, index) => {
+          if (index === 0) {
+            // First line is the comment
+            modelLines.push(`    ${line}`)
+          } else {
+            // Subsequent lines - check if it's spread operator syntax
+            const trimmedLine = line.trim()
+            if (trimmedLine.startsWith('*[') && trimmedLine.endsWith(']')) {
+              // Spread operator syntax - don't add comma
+              modelLines.push(`    ${line}`)
+            } else {
+              // Regular layer code - add comma
+              modelLines.push(`    ${line},`)
+            }
+          }
+        })
+      } else {
+        // Single line code - check if it's spread operator syntax
+        const trimmedCode = layerCode.trim()
+        if (trimmedCode.startsWith('*[') && trimmedCode.endsWith(']')) {
+          // Spread operator syntax - don't add comma
+          modelLines.push(`    ${layerCode}`)
+        } else {
+          // Regular layer code - add comma
+          modelLines.push(`    ${layerCode},`)
+        }
+      }
     }
   })
 
@@ -332,21 +362,58 @@ export function generateFunctionalKerasCode(dagResult: DAGResult): string {
         }
       }
       
-      if (inputNodes.length === 0) {
-        codeLines.push(`# Warning: ${varName} has no inputs`)
-        codeLines.push(`${varName} = ${layerCode}`)
-      } else if (inputNodes.length === 1) {
-        codeLines.push(`${varName} = ${layerCode}(${inputNodes[0]})`)
-      } else {
-        // Multiple inputs - might need merge layer
-        if (type === 'Merge') {
-          codeLines.push(`${varName} = ${layerCode}([${inputNodes.join(', ')}])`)
-        } else {
-          codeLines.push(`${varName} = ${layerCode}([${inputNodes.join(', ')}])`)
-        }
-      }
+      // Check if this is multi-line layer code (multiplier > 5)
+      const lines = layerCode.split('\n')
+      const isMultiLine = lines.length > 1
       
-      layerVariables.set(id, varName)
+      if (isMultiLine) {
+        // Handle multiplier > 5 case for Functional API with condensed approach
+        const commentLine = lines[0]
+        const spreadLine = lines[1]
+        
+        codeLines.push(`${commentLine}`)
+        
+        if (inputNodes.length === 0) {
+          codeLines.push(`# Warning: ${varName} has no inputs`)
+          codeLines.push(`${varName} = ${spreadLine}`)
+        } else if (inputNodes.length === 1) {
+          // Use a more readable loop approach
+          const match = spreadLine.match(/\*\[(.+?) for _ in range\((\d+)\)\]/)
+          if (match) {
+            const layerConstructor = match[1]
+            const count = parseInt(match[2])
+            
+            // Generate a for loop for better readability
+            codeLines.push(`${varName} = ${inputNodes[0]}`)
+            codeLines.push(`for _ in range(${count}):`)
+            codeLines.push(`    ${varName} = ${layerConstructor}(${varName})`)
+          }
+        } else {
+          // Multiple inputs - might need merge layer
+          if (type === 'Merge') {
+            codeLines.push(`${varName} = ${spreadLine}([${inputNodes.join(', ')}])`)
+          } else {
+            codeLines.push(`${varName} = ${spreadLine}([${inputNodes.join(', ')}])`)
+          }
+        }
+        layerVariables.set(id, varName)
+      } else {
+        // Single line layer code - handle normally
+        if (inputNodes.length === 0) {
+          codeLines.push(`# Warning: ${varName} has no inputs`)
+          codeLines.push(`${varName} = ${layerCode}`)
+        } else if (inputNodes.length === 1) {
+          codeLines.push(`${varName} = ${layerCode}(${inputNodes[0]})`)
+        } else {
+          // Multiple inputs - might need merge layer
+          if (type === 'Merge') {
+            codeLines.push(`${varName} = ${layerCode}([${inputNodes.join(', ')}])`)
+          } else {
+            codeLines.push(`${varName} = ${layerCode}([${inputNodes.join(', ')}])`)
+          }
+        }
+        layerVariables.set(id, varName)
+      }
     }
   })
 
