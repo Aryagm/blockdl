@@ -123,11 +123,11 @@ function CanvasEditorInner({
   // Handle connection between nodes
   const onConnect = useCallback(
     (params: Connection | Edge) => {
-      // Add smoothstep edge type for a balance between smooth and structured
+      // Add smoothstep edge type for cleaner vertical connections
       const edgeWithType = {
         ...params,
         type: 'smoothstep',
-        style: { strokeWidth: 3, stroke: '#374151' }
+        style: { strokeWidth: 2, stroke: '#6b7280' }
       }
       const newEdges = addEdge(edgeWithType, edges)
       setEdges(newEdges)
@@ -219,12 +219,12 @@ function CanvasEditorInner({
         connectionLineType={ConnectionLineType.SmoothStep}
         defaultEdgeOptions={{
           type: 'smoothstep',
-          style: { strokeWidth: 3, stroke: '#374151' }
+          style: { strokeWidth: 2, stroke: '#6b7280' }
         }}
       >
         <Controls />
         <MiniMap />
-        <Background variant={BackgroundVariant.Lines} gap={20} size={2} color="#faf7f7" />
+        <Background variant={BackgroundVariant.Lines} gap={25} size={1} color="#f7f7f7" />
       </ReactFlow>
     </div>
   )

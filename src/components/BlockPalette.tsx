@@ -1,4 +1,3 @@
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from './ui/dialog'
 import { Trash2 } from 'lucide-react'
@@ -154,46 +153,38 @@ export function BlockPalette({
           </h3>
           <div className="space-y-2">
             {category.layers.map((layer) => (
-              <Card
+              <div
                 key={layer.type}
-                className={`cursor-move hover:shadow-lg transition-all duration-300 hover:scale-[1.02] ${category.borderColor} ${category.bgColor} hover:shadow-slate-200 rounded-xl shadow-sm`}
+                className={`cursor-move hover:shadow-lg transition-all duration-300 hover:scale-[1.02] ${category.borderColor} ${category.bgColor} hover:shadow-slate-200 rounded-xl shadow-sm border-2 p-3`}
                 draggable
                 onDragStart={(event) => handleDragStart(event, layer.type)}
                 style={{ cursor: 'grab' }}
                 onMouseDown={(e) => e.currentTarget.style.cursor = 'grabbing'}
                 onMouseUp={(e) => e.currentTarget.style.cursor = 'grab'}
               >
-                <CardHeader className="pb-3">
-                  <CardTitle className={`text-sm flex items-center gap-3 ${category.textColor}`}>
-                    <span className="text-lg">{layer.icon}</span>
-                    {layer.type}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <p className="text-xs text-slate-500">
-                    {layer.description}
-                  </p>
-                </CardContent>
-              </Card>
+                <div className={`flex items-center gap-2 mb-1 ${category.textColor}`}>
+                  <span className="text-base">{layer.icon}</span>
+                  <span className="font-medium text-sm">{layer.type}</span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  {layer.description}
+                </p>
+              </div>
             ))}
           </div>
         </div>
       ))}
       
-      <Card className="border-slate-200 bg-blue-50/50 rounded-xl shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm text-blue-700 flex items-center gap-2">
-            <span>💡</span>
-            How to use
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <p className="text-xs text-blue-600">
-            Drag and drop blocks onto the canvas to build your neural network architecture.
-            Double-click blocks to edit parameters, or click the trash icon to remove them.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="border-slate-200 bg-blue-50/50 rounded-xl shadow-sm border-2 p-3">
+        <div className="text-sm text-blue-700 flex items-center gap-2 mb-1">
+          <span>💡</span>
+          <span className="font-medium">How to use</span>
+        </div>
+        <p className="text-xs text-blue-600 leading-relaxed">
+          Drag and drop blocks onto the canvas to build your neural network architecture.
+          Double-click blocks to edit parameters, or click the trash icon to remove them.
+        </p>
+      </div>
     </div>
   )
 }

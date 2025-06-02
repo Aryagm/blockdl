@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Handle, Position, useReactFlow } from '@xyflow/react'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -45,13 +44,6 @@ interface LayerNodeProps {
   data: LayerNodeData
 }
 
-// Format params for display
-const formatParams = (params: Record<string, any>): string => {
-  return Object.entries(params)
-    .map(([key, value]) => `${key}: ${value}`)
-    .join(', ')
-}
-
 export function LayerNode({ id, data }: LayerNodeProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [editParams, setEditParams] = useState(data.params || getDefaultParams(data.type))
@@ -60,7 +52,6 @@ export function LayerNode({ id, data }: LayerNodeProps) {
   const { type, params = getDefaultParams(data.type), hasShapeError = false, shapeErrorMessage } = data
   const layerDef = getLayerDef(type)
   const icon = getLayerIcon(type)
-  const formattedParams = formatParams(params)
   const categoryColors = getLayerCategoryColor(type)
 
   const handleDoubleClick = () => {
@@ -135,6 +126,20 @@ export function LayerNode({ id, data }: LayerNodeProps) {
     )
   }
 
+  // Count total parameters to show if there are more
+  const totalParams = layerDef?.formSpec.length || 0
+  const visibleParams = []
+  
+  // Collect visible parameters in order of importance
+  if (params.shape) visibleParams.push(`shape: ${params.shape}`)
+  if (params.filters) visibleParams.push(`${params.filters} filters`)
+  if (params.units) visibleParams.push(`${params.units} units`)
+  if (params.pool_size) visibleParams.push(`pool: ${params.pool_size}`)
+  if (params.kernel_size) visibleParams.push(`kernel: ${params.kernel_size}`)
+  if (params.activation && params.activation !== 'linear') visibleParams.push(params.activation)
+  if (params.rate) visibleParams.push(`rate: ${params.rate}`)
+  if (params.size) visibleParams.push(`size: ${params.size}`)
+
   return (
     <div className="layer-node">
       {/* Input handle - only show if not Input layer */}
@@ -142,7 +147,7 @@ export function LayerNode({ id, data }: LayerNodeProps) {
         <Handle
           type="target"
           position={Position.Top}
-          className={`w-3 h-3 border-2 border-white shadow-sm ${
+          className={`w-4 h-4 border-2 border-white shadow-sm ${
             hasShapeError ? '!bg-red-500' : '!bg-blue-500'
           }`}
         />
@@ -157,47 +162,58 @@ export function LayerNode({ id, data }: LayerNodeProps) {
                 e.stopPropagation()
                 handleDelete()
               }}
-              className="absolute -top-2 -right-2 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg hover:shadow-xl hover:scale-110"
+              className="absolute -top-2 -right-2 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg hover:shadow-xl hover:scale-110"
               title="Delete this block"
             >
               <Trash2 className="h-3 w-3" />
             </button>
             
-            <Card 
-              className={`min-w-[160px] shadow-md border-2 hover:shadow-xl transition-all duration-300 cursor-pointer rounded-xl hover:scale-[1.02] ${
+            {/* Larger horizontal block with consistent spacing */}
+            <div 
+              className={`flex flex-col px-4 py-3 rounded-xl shadow-md border-2 hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-[1.02] min-w-[160px] max-w-[280px] ${
                 hasShapeError 
-                  ? 'border-red-500 hover:border-red-600 hover:shadow-red-200/50 bg-white' 
+                  ? 'border-red-500 hover:border-red-600 hover:shadow-red-200/50 bg-red-50' 
                   : `${categoryColors.border} ${categoryColors.hover} ${categoryColors.bg}`
               }`}
               onDoubleClick={handleDoubleClick}
-              title={hasShapeError ? `Shape Error: ${shapeErrorMessage}` : undefined}
+              title={hasShapeError ? `Shape Error: ${shapeErrorMessage}` : `${type} - Double click to edit`}
             >
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-3">
-                  <span className="text-lg group-hover:scale-110 transition-transform duration-200">{icon}</span>
-                  <span className={`font-semibold ${hasShapeError ? 'text-red-700' : 'text-slate-700'}`}>{type}</span>
-                  {hasShapeError && (
-                    <span className="text-red-500 text-xs font-bold" title={`Shape Error: ${shapeErrorMessage}`}>
-                      ⚠️
+              {/* Header with icon and name - always centered */}
+              <div className={`flex items-center gap-2 ${visibleParams.length === 0 && !hasShapeError ? 'justify-center' : ''}`}>
+                <span className="text-base group-hover:scale-110 transition-transform duration-200 flex-shrink-0">{icon}</span>
+                <span className={`font-semibold text-sm truncate ${hasShapeError ? 'text-red-700' : 'text-slate-700'}`}>
+                  {type}
+                </span>
+                {hasShapeError && (
+                  <span className="text-red-500 text-sm font-bold flex-shrink-0" title={`Shape Error: ${shapeErrorMessage}`}>
+                    ⚠️
+                  </span>
+                )}
+              </div>
+              
+              {/* Parameters display with consistent spacing */}
+              {visibleParams.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {visibleParams.slice(0, 3).map((param, index) => (
+                    <span key={index} className="text-xs text-slate-600 bg-white/70 px-2 py-0.5 rounded-md">
+                      {param}
+                    </span>
+                  ))}
+                  {totalParams > 3 && (
+                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md font-medium">
+                      +{totalParams - 3} more
                     </span>
                   )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                {hasShapeError && (
-                  <div className="text-xs text-red-600 mb-2 p-2 bg-red-50 rounded border border-red-200">
-                    <span className="font-semibold">Shape Error:</span> {shapeErrorMessage}
-                  </div>
-                )}
-                <div className="text-xs text-slate-500">
-                  {formattedParams && (
-                    <div className="bg-slate-100 rounded-lg px-3 py-2 font-mono text-slate-600">
-                      {formattedParams}
-                    </div>
-                  )}
                 </div>
-              </CardContent>
-            </Card>
+              )}
+              
+              {/* Error message display with consistent spacing */}
+              {hasShapeError && shapeErrorMessage && (
+                <div className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-md border border-red-200 mt-2">
+                  {shapeErrorMessage}
+                </div>
+              )}
+            </div>
           </div>
         </PopoverTrigger>
         
@@ -236,7 +252,7 @@ export function LayerNode({ id, data }: LayerNodeProps) {
         <Handle
           type="source"
           position={Position.Bottom}
-          className={`w-3 h-3 border-2 border-white shadow-sm ${
+          className={`w-4 h-4 border-2 border-white shadow-sm ${
             hasShapeError ? '!bg-red-500' : '!bg-green-500'
           }`}
         />
