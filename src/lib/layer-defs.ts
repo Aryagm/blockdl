@@ -11,6 +11,7 @@ export interface LayerFormField {
   min?: number
   max?: number
   step?: number
+  show?: (params: Record<string, any>) => boolean
 }
 
 export interface LayerDef {
@@ -40,15 +41,111 @@ export const layerDefs: Record<string, LayerDef> = {
     type: 'Input',
     icon: '📥',
     description: 'Input layer for data',
-    defaultParams: { shape: '(784,)' },
+    defaultParams: { 
+      inputType: 'image_grayscale',
+      height: 28,
+      width: 28,
+      channels: 1,
+      flatSize: 784,
+      seqLength: 100,
+      features: 128,
+      customShape: '(784,)'
+    },
     formSpec: [
       {
-        key: 'shape',
-        label: 'Input Shape',
+        key: 'inputType',
+        label: 'Input Type',
+        type: 'select',
+        options: [
+          { value: 'image_grayscale', label: 'Grayscale Image (H×W×1)' },
+          { value: 'image_color', label: 'Color Image (H×W×3)' },
+          { value: 'image_custom', label: 'Custom Image (H×W×C)' },
+          { value: 'flat_data', label: 'Flattened Data (N,)' },
+          { value: 'sequence', label: 'Sequence Data (seq_len, features)' },
+          { value: 'custom', label: 'Custom Shape' }
+        ]
+      },
+      {
+        key: 'height',
+        label: 'Height',
+        type: 'number',
+        min: 1
+      },
+      {
+        key: 'width',
+        label: 'Width', 
+        type: 'number',
+        min: 1
+      },
+      {
+        key: 'channels',
+        label: 'Channels',
+        type: 'number',
+        min: 1
+      },
+      {
+        key: 'flatSize',
+        label: 'Size',
+        type: 'number',
+        min: 1
+      },
+      {
+        key: 'seqLength',
+        label: 'Sequence Length',
+        type: 'number',
+        min: 1
+      },
+      {
+        key: 'features',
+        label: 'Features',
+        type: 'number',
+        min: 1
+      },
+      {
+        key: 'customShape',
+        label: 'Custom Shape',
         type: 'text'
       }
     ],
-    codeGen: (params) => `Input(shape=${params.shape || '(784,)'})`,
+    codeGen: (params) => {
+      const inputType = params.inputType || 'image_grayscale'
+      let shape = '(784,)'
+      
+      switch (inputType) {
+        case 'image_grayscale':
+          const h1 = params.height || 28
+          const w1 = params.width || 28
+          shape = `(${h1}, ${w1}, 1)`
+          break
+        case 'image_color':
+          const h2 = params.height || 28
+          const w2 = params.width || 28
+          shape = `(${h2}, ${w2}, 3)`
+          break
+        case 'image_custom':
+          const h3 = params.height || 28
+          const w3 = params.width || 28
+          const c3 = params.channels || 1
+          shape = `(${h3}, ${w3}, ${c3})`
+          break
+        case 'flat_data':
+          const size = params.flatSize || 784
+          shape = `(${size},)`
+          break
+        case 'sequence':
+          const seqLen = params.seqLength || 100
+          const features = params.features || 128
+          shape = `(${seqLen}, ${features})`
+          break
+        case 'custom':
+          shape = params.customShape || '(784,)'
+          break
+        default:
+          shape = '(784,)'
+      }
+      
+      return `Input(shape=${shape})`
+    },
     kerasImport: 'Input'
   },
 
@@ -56,13 +153,39 @@ export const layerDefs: Record<string, LayerDef> = {
     type: 'Output',
     icon: '📤',
     description: 'Output layer',
-    defaultParams: { units: 10, activation: 'softmax' },
+    defaultParams: { 
+      outputType: 'multiclass',
+      numClasses: 10,
+      activation: 'softmax',
+      units: 1,
+      threshold: 0.5
+    },
     formSpec: [
       {
-        key: 'units',
-        label: 'Units',
+        key: 'outputType',
+        label: 'Output Type',
+        type: 'select',
+        options: [
+          { value: 'multiclass', label: 'Multi-class Classification (softmax)' },
+          { value: 'binary', label: 'Binary Classification (sigmoid)' },
+          { value: 'regression', label: 'Regression (linear)' },
+          { value: 'multilabel', label: 'Multi-label Classification (sigmoid)' },
+          { value: 'custom', label: 'Custom Configuration' }
+        ]
+      },
+      {
+        key: 'numClasses',
+        label: 'Number of Classes',
         type: 'number',
-        min: 1
+        min: 2,
+        show: (params) => params.outputType === 'multiclass'
+      },
+      {
+        key: 'units',
+        label: 'Output Units',
+        type: 'number',
+        min: 1,
+        show: (params) => params.outputType === 'custom' || params.outputType === 'multilabel' || params.outputType === 'regression'
       },
       {
         key: 'activation',
@@ -71,14 +194,53 @@ export const layerDefs: Record<string, LayerDef> = {
         options: [
           { value: 'softmax', label: 'Softmax' },
           { value: 'sigmoid', label: 'Sigmoid' },
-          { value: 'linear', label: 'Linear' }
-        ]
+          { value: 'linear', label: 'Linear' },
+          { value: 'tanh', label: 'Tanh' },
+          { value: 'relu', label: 'ReLU' }
+        ],
+        show: (params) => params.outputType === 'custom'
+      },
+      {
+        key: 'threshold',
+        label: 'Decision Threshold',
+        type: 'number',
+        min: 0,
+        max: 1,
+        step: 0.1,
+        show: (params) => params.outputType === 'binary'
       }
     ],
     codeGen: (params) => {
-      const outputUnits = params.units || 10
-      const outputActivation = params.activation ? `, activation='${params.activation}'` : ''
-      return `Dense(${outputUnits}${outputActivation})`
+      const outputType = params.outputType || 'multiclass'
+      let units, activation
+      
+      switch (outputType) {
+        case 'multiclass':
+          units = params.numClasses || 10
+          activation = 'softmax'
+          break
+        case 'binary':
+          units = 1
+          activation = 'sigmoid'
+          break
+        case 'regression':
+          units = params.units || 1
+          activation = 'linear'
+          break
+        case 'multilabel':
+          units = params.units || 10
+          activation = 'sigmoid'
+          break
+        case 'custom':
+          units = params.units || 10
+          activation = params.activation || 'softmax'
+          break
+        default:
+          units = 10
+          activation = 'softmax'
+      }
+      
+      return `Dense(${units}, activation='${activation}')`
     },
     kerasImport: 'Dense'
   },

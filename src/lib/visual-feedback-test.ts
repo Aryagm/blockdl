@@ -24,7 +24,11 @@ export const networkWithShapeError: { nodes: Node[], edges: Edge[] } = {
       position: { x: 100, y: 50 },
       data: {
         type: 'Input',
-        params: { shape: '(28, 28, 1)' } // MNIST-like input
+        params: { 
+          inputType: 'image_grayscale',
+          height: 28,
+          width: 28
+        } // MNIST-like input
       }
     },
     {
@@ -77,7 +81,11 @@ export const networkWithValidShapes: { nodes: Node[], edges: Edge[] } = {
       position: { x: 100, y: 50 },
       data: {
         type: 'Input',
-        params: { shape: '(28, 28, 1)' }
+        params: { 
+          inputType: 'image_grayscale',
+          height: 28,
+          width: 28
+        }
       }
     },
     {
@@ -143,7 +151,11 @@ export const networkWithMultipleErrors: { nodes: Node[], edges: Edge[] } = {
       position: { x: 50, y: 50 },
       data: {
         type: 'Input',
-        params: { shape: '(32, 32, 3)' }
+        params: { 
+          inputType: 'image_color',
+          height: 32,
+          width: 32
+        }
       }
     },
     {

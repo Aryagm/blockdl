@@ -32,7 +32,7 @@ function createTestEdge(source: string, target: string): Edge {
 // Test 1: Simple Dense network
 console.log('=== Test 1: Simple Dense Network ===')
 const denseNodes: Node[] = [
-  createTestNode('input1', 'Input', { shape: '(784,)' }),
+  createTestNode('input1', 'Input', { inputType: 'flat_data', flatSize: 784 }),
   createTestNode('dense1', 'Dense', { units: 128 }),
   createTestNode('dense2', 'Dense', { units: 64 }),
   createTestNode('output1', 'Output', { units: 10, activation: 'softmax' })
@@ -57,7 +57,7 @@ if (denseDAG.isValid) {
 // Test 2: CNN network
 console.log('\n=== Test 2: CNN Network ===')
 const cnnNodes: Node[] = [
-  createTestNode('input2', 'Input', { shape: '(28, 28, 1)' }),
+  createTestNode('input2', 'Input', { inputType: 'image_grayscale', height: 28, width: 28 }),
   createTestNode('conv1', 'Conv2D', { filters: 32, kernel_size: '(3,3)', padding: 'same' }),
   createTestNode('pool1', 'MaxPool2D', { pool_size: '(2,2)' }),
   createTestNode('conv2', 'Conv2D', { filters: 64, kernel_size: '(3,3)', padding: 'same' }),
@@ -90,8 +90,8 @@ if (cnnDAG.isValid) {
 // Test 3: Network with merge layer
 console.log('\n=== Test 3: Network with Merge Layer ===')
 const mergeNodes: Node[] = [
-  createTestNode('input3a', 'Input', { shape: '(64,)' }),
-  createTestNode('input3b', 'Input', { shape: '(64,)' }),
+  createTestNode('input3a', 'Input', { inputType: 'flat_data', flatSize: 64 }),
+  createTestNode('input3b', 'Input', { inputType: 'flat_data', flatSize: 64 }),
   createTestNode('dense4', 'Dense', { units: 32 }),
   createTestNode('dense5', 'Dense', { units: 32 }),
   createTestNode('merge1', 'Merge', { mode: 'concat' }),
@@ -119,7 +119,7 @@ if (mergeDAG.isValid) {
 // Test 4: Invalid shape network
 console.log('\n=== Test 4: Invalid Shape Network ===')
 const invalidNodes: Node[] = [
-  createTestNode('input4', 'Input', { shape: '(invalid)' }),
+  createTestNode('input4', 'Input', { inputType: 'custom', customShape: '(invalid)' }),
   createTestNode('dense6', 'Dense', { units: 10 })
 ]
 

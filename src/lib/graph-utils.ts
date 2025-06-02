@@ -275,8 +275,9 @@ export function generateKerasCode(layers: LayerObject[]): string {
               // Spread operator syntax - don't add comma
               modelLines.push(`    ${line}`)
             } else {
-              // Regular layer code - add comma
-              modelLines.push(`    ${line},`)
+              // Regular layer code - add comma only if it doesn't already end with one
+              const hasComma = trimmedLine.endsWith(',')
+              modelLines.push(`    ${line}${hasComma ? '' : ','}`)
             }
           }
         })
@@ -672,12 +673,54 @@ export function computeShapes(dag: { orderedNodes: LayerObject[], edgeMap: Map<s
     
     try {
       if (node.type === 'Input') {
-        // Input layer defines the initial shape
-        const nodeInputShape = parseShape(node.params.shape || inputShape)
+        // Input layer defines the initial shape - compute from inputType and dimensions
+        let computedShape = inputShape; // fallback to default input shape
+        
+        if (node.params.inputType) {
+          // New input layer structure - compute shape from input type
+          const inputType = node.params.inputType;
+          switch (inputType) {
+            case 'image_grayscale':
+              const h1 = node.params.height || 28;
+              const w1 = node.params.width || 28;
+              computedShape = `(${h1}, ${w1}, 1)`;
+              break;
+            case 'image_color':
+              const h2 = node.params.height || 28;
+              const w2 = node.params.width || 28;
+              computedShape = `(${h2}, ${w2}, 3)`;
+              break;
+            case 'image_custom':
+              const h3 = node.params.height || 28;
+              const w3 = node.params.width || 28;
+              const c3 = node.params.channels || 1;
+              computedShape = `(${h3}, ${w3}, ${c3})`;
+              break;
+            case 'flat_data':
+              const size = node.params.flatSize || 784;
+              computedShape = `(${size},)`;
+              break;
+            case 'sequence':
+              const seqLen = node.params.seqLength || 100;
+              const features = node.params.features || 128;
+              computedShape = `(${seqLen}, ${features})`;
+              break;
+            case 'custom':
+              computedShape = node.params.customShape || '(784,)';
+              break;
+            default:
+              computedShape = '(784,)';
+          }
+        } else if (node.params.shape) {
+          // Legacy input layer with shape parameter
+          computedShape = node.params.shape;
+        }
+        
+        const nodeInputShape = parseShape(computedShape)
         if (!nodeInputShape) {
           errors.push({
             nodeId: node.id,
-            message: `Invalid input shape in Input layer: ${node.params.shape}`
+            message: `Invalid input shape in Input layer: ${computedShape}`
           })
           continue
         }

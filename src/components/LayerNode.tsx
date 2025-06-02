@@ -75,7 +75,52 @@ export function LayerNode({ id, data }: LayerNodeProps) {
   }
 
   const renderParamEditor = (field: any) => {
-    const { key, label, type, options, min, max, step } = field
+    const { key, label, type, options, min, max, step, show } = field
+
+    // Check if field should be shown based on show function
+    if (show && !show(editParams)) {
+      return null
+    }
+
+    // For Input layer, show/hide fields based on inputType (legacy support)
+    if (data.type === 'Input') {
+      const inputType = editParams.inputType || 'image_grayscale'
+      
+      // Always show inputType selector
+      if (key === 'inputType') {
+        // Continue with normal rendering
+      }
+      // Show height/width/channels for image types
+      else if (['height', 'width'].includes(key)) {
+        if (!['image_grayscale', 'image_color', 'image_custom'].includes(inputType)) {
+          return null // Hide these fields for non-image types
+        }
+      }
+      // Show channels only for custom image type
+      else if (key === 'channels') {
+        if (inputType !== 'image_custom') {
+          return null
+        }
+      }
+      // Show flatSize only for flat_data type
+      else if (key === 'flatSize') {
+        if (inputType !== 'flat_data') {
+          return null
+        }
+      }
+      // Show sequence fields only for sequence type
+      else if (['seqLength', 'features'].includes(key)) {
+        if (inputType !== 'sequence') {
+          return null
+        }
+      }
+      // Show customShape only for custom type
+      else if (key === 'customShape') {
+        if (inputType !== 'custom') {
+          return null
+        }
+      }
+    }
 
     if (type === 'select') {
       const currentValue = editParams[key]?.toString() || ''
@@ -131,20 +176,119 @@ export function LayerNode({ id, data }: LayerNodeProps) {
   const visibleParams = []
   
   // Collect visible parameters in order of importance
-  if (params.shape) visibleParams.push(`shape: ${params.shape}`)
+  
+  // For Input layers, show the computed shape based on input type
+  if (type === 'Input') {
+    const inputType = params.inputType || 'image_grayscale'
+    let displayShape = ''
+    
+    switch (inputType) {
+      case 'image_grayscale':
+        const h1 = params.height || 28
+        const w1 = params.width || 28
+        displayShape = `${h1}×${w1}×1`
+        break
+      case 'image_color':
+        const h2 = params.height || 28
+        const w2 = params.width || 28
+        displayShape = `${h2}×${w2}×3`
+        break
+      case 'image_custom':
+        const h3 = params.height || 28
+        const w3 = params.width || 28
+        const c3 = params.channels || 1
+        displayShape = `${h3}×${w3}×${c3}`
+        break
+      case 'flat_data':
+        const size = params.flatSize || 784
+        displayShape = `${size}`
+        break
+      case 'sequence':
+        const seqLen = params.seqLength || 100
+        const features = params.features || 128
+        displayShape = `${seqLen}×${features}`
+        break
+      case 'custom':
+        displayShape = params.customShape || '784'
+        break
+      default:
+        displayShape = '28×28×1'
+    }
+    
+    visibleParams.push(`shape: ${displayShape}`)
+    
+    // Show input type as well
+    const inputTypeLabels: Record<string, string> = {
+      'image_grayscale': 'Grayscale',
+      'image_color': 'Color', 
+      'image_custom': 'Custom Image',
+      'flat_data': 'Flattened',
+      'sequence': 'Sequence',
+      'custom': 'Custom'
+    }
+    visibleParams.push(inputTypeLabels[inputType as string] || inputType)
+  }
+  
+  // Legacy support for old shape parameter
+  if (params.shape && type !== 'Input') visibleParams.push(`shape: ${params.shape}`)
   
   // For Activation layers, show the activation type prominently like Input shows shape
   if (type === 'Activation' && params.type) {
     visibleParams.push(`${params.type}`)
   }
   
+  // For Output layers, show output configuration instead of raw parameters
+  if (type === 'Output') {
+    const outputType = params.outputType || 'multiclass'
+    const outputTypeLabels: Record<string, string> = {
+      'multiclass': 'Multi-class',
+      'binary': 'Binary',
+      'regression': 'Regression',
+      'multilabel': 'Multi-label',
+      'custom': 'Custom'
+    }
+    
+    switch (outputType) {
+      case 'multiclass':
+        const numClasses = params.numClasses || 10
+        visibleParams.push(`${numClasses} classes`)
+        visibleParams.push('softmax')
+        break
+      case 'binary':
+        visibleParams.push('1 unit')
+        visibleParams.push('sigmoid')
+        if (params.threshold && params.threshold !== 0.5) {
+          visibleParams.push(`threshold: ${params.threshold}`)
+        }
+        break
+      case 'regression':
+        const regUnits = params.units || 1
+        visibleParams.push(`${regUnits} output${regUnits > 1 ? 's' : ''}`)
+        visibleParams.push('linear')
+        break
+      case 'multilabel':
+        const mlUnits = params.units || 10
+        visibleParams.push(`${mlUnits} labels`)
+        visibleParams.push('sigmoid')
+        break
+      case 'custom':
+        const customUnits = params.units || 10
+        const customActivation = params.activation || 'softmax'
+        visibleParams.push(`${customUnits} units`)
+        visibleParams.push(customActivation)
+        break
+      default:
+        visibleParams.push(outputTypeLabels[outputType] || outputType)
+    }
+  }
+  
   if (params.filters) visibleParams.push(`${params.filters} filters`)
-  if (params.units) visibleParams.push(`${params.units} units`)
+  if (params.units && type !== 'Output') visibleParams.push(`${params.units} units`)
   if (params.pool_size) visibleParams.push(`pool: ${params.pool_size}`)
   if (params.kernel_size) visibleParams.push(`kernel: ${params.kernel_size}`)
   
-  // For non-Activation layers, show activation if it's not default/linear
-  if (type !== 'Activation' && params.activation && params.activation !== 'linear' && params.activation !== 'none') {
+  // For non-Activation and non-Output layers, show activation if it's not default/linear
+  if (type !== 'Activation' && type !== 'Output' && params.activation && params.activation !== 'linear' && params.activation !== 'none') {
     visibleParams.push(params.activation)
   }
   
@@ -218,7 +362,9 @@ export function LayerNode({ id, data }: LayerNodeProps) {
                       {param}
                     </span>
                   ))}
-                  {totalParams > 3 && (
+                  {/* Only show "more" indicator for layers that have more actual parameters, 
+                      not for Input layers which show computed display values */}
+                  {type !== 'Input' && totalParams > 3 && (
                     <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md font-medium">
                       +{totalParams - 3} more
                     </span>

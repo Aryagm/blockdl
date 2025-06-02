@@ -61,7 +61,50 @@ function CanvasEditorInner({
     try {
       // Find the input node to determine the input shape
       const inputNode = currentNodes.find(node => node.data.type === 'Input')
-      const inputShape = (inputNode?.data.params as any)?.shape || '(224, 224, 3)' // Default input shape
+      let inputShape = '(224, 224, 3)' // Default fallback shape
+      
+      if (inputNode?.data.params) {
+        const params = inputNode.data.params as Record<string, any>;
+        // Check if it's the new input type structure
+        if (params.inputType) {
+          const inputType = params.inputType;
+          switch (inputType) {
+            case 'image_grayscale':
+              const h1 = params.height || 28;
+              const w1 = params.width || 28;
+              inputShape = `(${h1}, ${w1}, 1)`;
+              break;
+            case 'image_color':
+              const h2 = params.height || 28;
+              const w2 = params.width || 28;
+              inputShape = `(${h2}, ${w2}, 3)`;
+              break;
+            case 'image_custom':
+              const h3 = params.height || 28;
+              const w3 = params.width || 28;
+              const c3 = params.channels || 1;
+              inputShape = `(${h3}, ${w3}, ${c3})`;
+              break;
+            case 'flat_data':
+              const size = params.flatSize || 784;
+              inputShape = `(${size},)`;
+              break;
+            case 'sequence':
+              const seqLen = params.seqLength || 100;
+              const features = params.features || 128;
+              inputShape = `(${seqLen}, ${features})`;
+              break;
+            case 'custom':
+              inputShape = params.customShape || '(784,)';
+              break;
+            default:
+              inputShape = '(784,)';
+          }
+        } else if (params.shape) {
+          // Legacy input layer with shape parameter
+          inputShape = params.shape;
+        }
+      }
       
       const { errors } = computeNetworkShapes(currentNodes, currentEdges, inputShape)
       const errorMap = new Map<string, string>()
