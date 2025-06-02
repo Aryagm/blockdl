@@ -265,6 +265,17 @@ export function generateKerasCode(layers: LayerObject[]): string {
 
   modelLines.push('])')
 
+
+  // Generate layer code
+  layers.forEach((layer) => {
+    const layerCode = generateLayerCode(layer.type, layer.params)
+    if (layerCode) {
+      modelLines.push(`    ${layerCode},`)
+    }
+  })
+
+  modelLines.push('])')
+
   // Generate compilation and summary
   const compilationLines: string[] = [
     '',

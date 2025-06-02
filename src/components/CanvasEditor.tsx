@@ -8,7 +8,8 @@ import {
   useNodesState, 
   useEdgesState,
   addEdge,
-  BackgroundVariant
+  BackgroundVariant,
+  ConnectionLineType
 } from '@xyflow/react'
 import type { 
   Connection,
@@ -122,7 +123,13 @@ function CanvasEditorInner({
   // Handle connection between nodes
   const onConnect = useCallback(
     (params: Connection | Edge) => {
-      const newEdges = addEdge(params, edges)
+      // Add smoothstep edge type for a balance between smooth and structured
+      const edgeWithType = {
+        ...params,
+        type: 'smoothstep',
+        style: { strokeWidth: 3, stroke: '#374151' }
+      }
+      const newEdges = addEdge(edgeWithType, edges)
       setEdges(newEdges)
       onEdgesChange?.(newEdges)
       // Update shape errors after connection change
@@ -209,10 +216,15 @@ function CanvasEditorInner({
         attributionPosition="top-right"
         deleteKeyCode={[]}
         multiSelectionKeyCode={['Control', 'Meta']}
+        connectionLineType={ConnectionLineType.SmoothStep}
+        defaultEdgeOptions={{
+          type: 'smoothstep',
+          style: { strokeWidth: 3, stroke: '#374151' }
+        }}
       >
         <Controls />
         <MiniMap />
-        <Background variant={BackgroundVariant.Dots} gap={20} size={2} color="#cbd5e1" />
+        <Background variant={BackgroundVariant.Lines} gap={20} size={2} color="#faf7f7" />
       </ReactFlow>
     </div>
   )
