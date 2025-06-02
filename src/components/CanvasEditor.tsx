@@ -20,11 +20,7 @@ import '@xyflow/react/dist/style.css'
 import { LayerNode } from './LayerNode'
 import { getDefaultParams } from '../lib/layer-defs'
 import { computeNetworkShapes } from '../lib/shape-utils'
-
-// Initial nodes and edges - start with empty canvas
-const initialNodes: Node[] = []
-
-const initialEdges: Edge[] = []
+// Removed clear all button imports - moved to BlockPalette
 
 // Custom node types can be defined here
 const nodeTypes: NodeTypes = {
@@ -33,18 +29,31 @@ const nodeTypes: NodeTypes = {
 
 interface CanvasEditorProps {
   className?: string
+  nodes?: Node[]
+  edges?: Edge[]
   onNodesChange?: (nodes: Node[]) => void
   onEdgesChange?: (edges: Edge[]) => void
 }
 
 function CanvasEditorInner({ 
   className = '',
+  nodes: propNodes = [],
+  edges: propEdges = [],
   onNodesChange,
   onEdgesChange 
 }: CanvasEditorProps) {
-  const [nodes, setNodes, onNodesChangeInternal] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesChangeInternal] = useEdgesState(initialEdges)
+  const [nodes, setNodes, onNodesChangeInternal] = useNodesState(propNodes)
+  const [edges, setEdges, onEdgesChangeInternal] = useEdgesState(propEdges)
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null)
+
+  // Sync props with internal state when they change
+  useEffect(() => {
+    setNodes(propNodes)
+  }, [propNodes, setNodes])
+
+  useEffect(() => {
+    setEdges(propEdges)
+  }, [propEdges, setEdges])
 
   // Compute shapes and update error state
   const updateShapeErrors = useCallback((currentNodes: Node[], currentEdges: Edge[]) => {

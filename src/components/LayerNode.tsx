@@ -87,11 +87,15 @@ export function LayerNode({ id, data }: LayerNodeProps) {
     const { key, label, type, options, min, max, step } = field
 
     if (type === 'select') {
+      const currentValue = editParams[key]?.toString() || ''
+      // For activation fields, default to 'none' if no value is set
+      const selectValue = currentValue === '' && key === 'activation' ? 'none' : currentValue
+      
       return (
         <div key={key} className="space-y-1">
           <Label htmlFor={key} className="text-xs">{label}</Label>
           <Select
-            value={editParams[key]?.toString() || ''}
+            value={selectValue}
             onValueChange={(newValue) => setEditParams({ ...editParams, [key]: newValue })}
           >
             <SelectTrigger className="h-8">

@@ -10,10 +10,23 @@ function App() {
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
 
-  const paletteContent = <BlockPalette />
+  const handleClearAll = () => {
+    setNodes([])
+    setEdges([])
+  }
+
+  const paletteContent = (
+    <BlockPalette 
+      nodes={nodes}
+      edges={edges}
+      onClearAll={handleClearAll}
+    />
+  )
 
   const canvasContent = (
     <CanvasEditor 
+      nodes={nodes}
+      edges={edges}
       onNodesChange={setNodes}
       onEdgesChange={setEdges}
     />

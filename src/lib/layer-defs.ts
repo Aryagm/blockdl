@@ -90,7 +90,7 @@ export const layerDefs: Record<string, LayerDef> = {
         label: 'Activation (optional)',
         type: 'select',
         options: [
-          { value: '', label: 'None' },
+          { value: 'none', label: 'None' },
           { value: 'relu', label: 'ReLU' },
           { value: 'sigmoid', label: 'Sigmoid' },
           { value: 'tanh', label: 'Tanh' },
@@ -101,7 +101,7 @@ export const layerDefs: Record<string, LayerDef> = {
     ],
     codeGen: (params) => {
       const units = params.units || 128
-      const activation = params.activation ? `, activation='${params.activation}'` : ''
+      const activation = params.activation && params.activation !== 'none' ? `, activation='${params.activation}'` : ''
       return `Dense(${units}${activation})`
     },
     kerasImport: 'Dense'
