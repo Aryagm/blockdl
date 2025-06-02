@@ -1,5 +1,5 @@
 import type { Node, Edge } from '@xyflow/react'
-import { generateLayerCode, getKerasImports } from './layer-defs'
+import { generateLayerCode, getUsedKerasImports } from './layer-defs'
 
 export interface LayerObject {
   id: string
@@ -244,8 +244,9 @@ export function generateKerasCode(layers: LayerObject[]): string {
   // For now, we'll generate Sequential model code for backward compatibility
   // TODO: Add support for Functional API for complex DAG structures
   
-  // Generate imports using the centralized function
-  const kerasImports = getKerasImports()
+  // Generate imports using only the layers that are actually used
+  const usedLayerTypes = layers.map(layer => layer.type)
+  const kerasImports = getUsedKerasImports(usedLayerTypes)
   const imports = [
     'import tensorflow as tf',
     'from tensorflow.keras.models import Sequential',
@@ -292,13 +293,14 @@ export function generateFunctionalKerasCode(dagResult: DAGResult): string {
 
   const { orderedNodes, edgeMap } = dagResult
 
-  // Generate imports
-  const kerasImports = getKerasImports()
+  // Generate imports using only the layers that are actually used
+  const usedLayerTypes = orderedNodes.map(layer => layer.type)
+  const kerasImports = getUsedKerasImports(usedLayerTypes.filter(type => type !== 'Input'))
   const imports = [
     'import tensorflow as tf',
     'from tensorflow.keras.models import Model',
     'from tensorflow.keras.layers import Input',
-    `from tensorflow.keras.layers import ${kerasImports.filter(imp => imp !== 'Input').join(', ')}`
+    `from tensorflow.keras.layers import ${kerasImports.join(', ')}`
   ]
 
   const codeLines: string[] = [...imports, '']

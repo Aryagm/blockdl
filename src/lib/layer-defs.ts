@@ -498,3 +498,21 @@ export function getKerasImports(): string[] {
   })
   return Array.from(imports).sort()
 }
+
+/**
+ * Get Keras imports for only the layers that are actually used in the network
+ */
+export function getUsedKerasImports(usedLayerTypes: string[]): string[] {
+  const imports = new Set<string>()
+  
+  usedLayerTypes.forEach(layerType => {
+    const layerDef = layerDefs[layerType]
+    if (layerDef && layerDef.kerasImport) {
+      // Handle comma-separated imports (like for Merge layer)
+      const layerImports = layerDef.kerasImport.split(',').map(imp => imp.trim())
+      layerImports.forEach(imp => imports.add(imp))
+    }
+  })
+  
+  return Array.from(imports).sort()
+}
