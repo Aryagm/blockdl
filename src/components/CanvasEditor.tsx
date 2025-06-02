@@ -18,8 +18,8 @@ import type {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { LayerNode } from './LayerNode'
-import { parseGraphToDAG, validateNetworkStructure } from '../lib/graph-utils'
 import { getDefaultParams } from '../lib/layer-defs'
+import { computeNetworkShapes } from '../lib/shape-utils'
 
 // Initial nodes and edges - start with empty canvas
 const initialNodes: Node[] = []
@@ -45,6 +45,45 @@ function CanvasEditorInner({
   const [nodes, setNodes, onNodesChangeInternal] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChangeInternal] = useEdgesState(initialEdges)
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null)
+
+  // Compute shapes and update error state
+  const updateShapeErrors = useCallback((currentNodes: Node[], currentEdges: Edge[]) => {
+    try {
+      // Find the input node to determine the input shape
+      const inputNode = currentNodes.find(node => node.data.type === 'Input')
+      const inputShape = (inputNode?.data.params as any)?.shape || '(224, 224, 3)' // Default input shape
+      
+      const { errors } = computeNetworkShapes(currentNodes, currentEdges, inputShape)
+      const errorMap = new Map<string, string>()
+      
+      errors.forEach(error => {
+        errorMap.set(error.nodeId, error.message)
+      })
+      
+      // Update nodes with error information
+      const updatedNodes = currentNodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          hasShapeError: errorMap.has(node.id),
+          shapeErrorMessage: errorMap.get(node.id)
+        }
+      }))
+      
+      if (JSON.stringify(updatedNodes) !== JSON.stringify(currentNodes)) {
+        setNodes(updatedNodes)
+      }
+    } catch (error) {
+      console.error('Error computing shapes:', error)
+    }
+  }, [setNodes])
+
+  // Effect to compute shapes when nodes or edges change
+  useEffect(() => {
+    if (nodes.length > 0) {
+      updateShapeErrors(nodes, edges)
+    }
+  }, [nodes, edges, updateShapeErrors])
 
   // Prevent all delete key functionality
   useEffect(() => {
@@ -77,8 +116,10 @@ function CanvasEditorInner({
       const newEdges = addEdge(params, edges)
       setEdges(newEdges)
       onEdgesChange?.(newEdges)
+      // Update shape errors after connection change
+      updateShapeErrors(nodes, newEdges)
     },
-    [edges, setEdges, onEdgesChange]
+    [edges, setEdges, onEdgesChange, nodes, updateShapeErrors]
   )
 
   // Handle nodes changes with callback
@@ -86,46 +127,20 @@ function CanvasEditorInner({
     (changes: any) => {
       onNodesChangeInternal(changes)
       
-      // Get updated nodes after changes are applied
-      const updatedNodes = nodes // This will be updated on next render
-      
-      // Validate network structure and get DAG information
-      const dagResult = parseGraphToDAG(updatedNodes, edges)
-      const validation = validateNetworkStructure(updatedNodes, edges)
-      
-      console.log('Network validation:', validation)
-      if (dagResult.isValid) {
-        console.log('DAG structure:', {
-          nodeCount: dagResult.orderedNodes.length,
-          hasComplexStructure: Array.from(dagResult.edgeMap.values()).some(targets => targets.length > 1)
-        })
-      }
-      
-      onNodesChange?.(updatedNodes)
+      // Get updated nodes after changes are applied - we'll use the current nodes
+      // and let the effect handle the shape computation
+      onNodesChange?.(nodes)
     },
-    [onNodesChangeInternal, onNodesChange, nodes, edges]
+    [onNodesChangeInternal, onNodesChange, nodes]
   )
 
   // Handle edges changes with callback
   const handleEdgesChange = useCallback(
     (changes: any) => {
       onEdgesChangeInternal(changes)
-      
-      // Validate network structure when edges change
-      const dagResult = parseGraphToDAG(nodes, edges)
-      const validation = validateNetworkStructure(nodes, edges)
-      
-      console.log('Network validation (edges changed):', validation)
-      if (dagResult.isValid) {
-        console.log('DAG structure (edges changed):', {
-          nodeCount: dagResult.orderedNodes.length,
-          hasComplexStructure: Array.from(dagResult.edgeMap.values()).some(targets => targets.length > 1)
-        })
-      }
-      
       onEdgesChange?.(edges)
     },
-    [onEdgesChangeInternal, onEdgesChange, edges, nodes]
+    [onEdgesChangeInternal, onEdgesChange, edges]
   )
 
   // Handle drag over event
