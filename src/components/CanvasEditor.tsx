@@ -143,20 +143,31 @@ function CanvasEditorInner({
     (changes: any) => {
       onNodesChangeInternal(changes)
       
-      // Get updated nodes after changes are applied - we'll use the current nodes
-      // and let the effect handle the shape computation
-      onNodesChange?.(nodes)
+      // Use a timeout to get the updated nodes after the changes are applied
+      setTimeout(() => {
+        setNodes(currentNodes => {
+          onNodesChange?.(currentNodes)
+          return currentNodes
+        })
+      }, 0)
     },
-    [onNodesChangeInternal, onNodesChange, nodes]
+    [onNodesChangeInternal, onNodesChange]
   )
 
   // Handle edges changes with callback
   const handleEdgesChange = useCallback(
     (changes: any) => {
       onEdgesChangeInternal(changes)
-      onEdgesChange?.(edges)
+      
+      // Use a timeout to get the updated edges after the changes are applied
+      setTimeout(() => {
+        setEdges(currentEdges => {
+          onEdgesChange?.(currentEdges)
+          return currentEdges
+        })
+      }, 0)
     },
-    [onEdgesChangeInternal, onEdgesChange, edges]
+    [onEdgesChangeInternal, onEdgesChange]
   )
 
   // Handle drag over event
@@ -193,11 +204,9 @@ function CanvasEditorInner({
         },
       }
 
-      const newNodes = [...nodes, newNode]
-      setNodes(newNodes)
-      onNodesChange?.(newNodes)
+      setNodes(currentNodes => [...currentNodes, newNode])
     },
-    [reactFlowInstance, nodes, setNodes, onNodesChange]
+    [reactFlowInstance, setNodes, onNodesChange]
   )
 
   return (

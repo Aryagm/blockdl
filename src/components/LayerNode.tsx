@@ -160,6 +160,7 @@ export function LayerNode({ id, data }: LayerNodeProps) {
             <button
               onClick={(e) => {
                 e.stopPropagation()
+                e.preventDefault()
                 handleDelete()
               }}
               className="absolute -top-2 -right-2 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg hover:shadow-xl hover:scale-110"
