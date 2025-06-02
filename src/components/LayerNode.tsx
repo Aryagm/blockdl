@@ -132,11 +132,22 @@ export function LayerNode({ id, data }: LayerNodeProps) {
   
   // Collect visible parameters in order of importance
   if (params.shape) visibleParams.push(`shape: ${params.shape}`)
+  
+  // For Activation layers, show the activation type prominently like Input shows shape
+  if (type === 'Activation' && params.type) {
+    visibleParams.push(`${params.type}`)
+  }
+  
   if (params.filters) visibleParams.push(`${params.filters} filters`)
   if (params.units) visibleParams.push(`${params.units} units`)
   if (params.pool_size) visibleParams.push(`pool: ${params.pool_size}`)
   if (params.kernel_size) visibleParams.push(`kernel: ${params.kernel_size}`)
-  if (params.activation && params.activation !== 'linear') visibleParams.push(params.activation)
+  
+  // For non-Activation layers, show activation if it's not default/linear
+  if (type !== 'Activation' && params.activation && params.activation !== 'linear' && params.activation !== 'none') {
+    visibleParams.push(params.activation)
+  }
+  
   if (params.rate) visibleParams.push(`rate: ${params.rate}`)
   if (params.size) visibleParams.push(`size: ${params.size}`)
   // Note: multiplier is shown as a badge in the header, no need to show it here again
