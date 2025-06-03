@@ -19,6 +19,8 @@ export function AppHeader({
 }: AppHeaderProps) {
   const [showHelpDialog, setShowHelpDialog] = useState(false)
   const [showClearDialog, setShowClearDialog] = useState(false)
+  const [showErrorDialog, setShowErrorDialog] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   const handleExportProject = () => {
     const projectData = {
@@ -57,10 +59,13 @@ export function AppHeader({
             if (data.nodes && data.edges) {
               onImportProject?.(data)
             } else {
-              alert('Invalid project file format')
+              setErrorMessage('Invalid project file format. Please ensure the file contains valid nodes and edges.')
+              setShowErrorDialog(true)
             }
           } catch (error) {
-            alert('Error reading project file')
+            console.error('Error reading project file:', error)
+            setErrorMessage('Error reading project file. Please check that the file is a valid JSON format.')
+            setShowErrorDialog(true)
           }
         }
         reader.readAsText(file)
@@ -197,6 +202,22 @@ export function AppHeader({
                 </ul>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Import Error</DialogTitle>
+              <DialogDescription>
+                {errorMessage}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button onClick={() => setShowErrorDialog(false)}>
+                OK
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

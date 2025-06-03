@@ -26,6 +26,8 @@
     "react-dom": "^19.1.0",
     "tailwind-merge": "^3.3.0",
     "tailwindcss": "^4.1.8",
+    "use-undo": "^1.1.1",
+    "zundo": "^2.3.0",
     "zustand": "^5.0.5"
   },
   "devDependencies": {
