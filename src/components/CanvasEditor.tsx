@@ -9,23 +9,39 @@ import {
   useEdgesState,
   addEdge,
   BackgroundVariant,
-  ConnectionLineType
+  ConnectionLineType,
 } from '@xyflow/react'
 import type { 
   Connection,
   Edge,
   Node,
-  NodeTypes
+  NodeTypes,
+  NodeChange,
+  EdgeChange,
+  ReactFlowInstance,
+  XYPosition
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { LayerNode } from './LayerNode'
 import { getDefaultParams } from '../lib/layer-defs'
 import { computeNetworkShapes } from '../lib/shape-utils'
-// Removed clear all button imports - moved to BlockPalette
 
 // Custom node types can be defined here
 const nodeTypes: NodeTypes = {
   layerNode: LayerNode,
+}
+
+interface LayerParams {
+  inputType?: string;
+  height?: number;
+  width?: number;
+  channels?: number;
+  flatSize?: number;
+  seqLength?: number;
+  features?: number;
+  customShape?: string;
+  shape?: string;
+  [key: string]: unknown;
 }
 
 interface CanvasEditorProps {
@@ -45,7 +61,7 @@ function CanvasEditorInner({
 }: CanvasEditorProps) {
   const [nodes, setNodes, onNodesChangeInternal] = useNodesState(propNodes)
   const [edges, setEdges, onEdgesChangeInternal] = useEdgesState(propEdges)
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null)
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null)
 
   // Sync props with internal state when they change
   useEffect(() => {
@@ -64,34 +80,41 @@ function CanvasEditorInner({
       let inputShape = '(224, 224, 3)' // Default fallback shape
       
       if (inputNode?.data.params) {
-        const params = inputNode.data.params as Record<string, any>;
+        const params = inputNode.data.params as LayerParams;
         // Check if it's the new input type structure
         if (params.inputType) {
           const inputType = params.inputType;
+          let h = 28;
+          let w = 28;
+          let c = 1;
+          let size = 784;
+          let seqLen = 100;
+          let features = 128;
+
           switch (inputType) {
             case 'image_grayscale':
-              const h1 = params.height || 28;
-              const w1 = params.width || 28;
-              inputShape = `(${h1}, ${w1}, 1)`;
+              h = params.height || 28;
+              w = params.width || 28;
+              inputShape = `(${h}, ${w}, 1)`;
               break;
             case 'image_color':
-              const h2 = params.height || 28;
-              const w2 = params.width || 28;
-              inputShape = `(${h2}, ${w2}, 3)`;
+              h = params.height || 28;
+              w = params.width || 28;
+              inputShape = `(${h}, ${w}, 3)`;
               break;
             case 'image_custom':
-              const h3 = params.height || 28;
-              const w3 = params.width || 28;
-              const c3 = params.channels || 1;
-              inputShape = `(${h3}, ${w3}, ${c3})`;
+              h = params.height || 28;
+              w = params.width || 28;
+              c = params.channels || 1;
+              inputShape = `(${h}, ${w}, ${c})`;
               break;
             case 'flat_data':
-              const size = params.flatSize || 784;
+              size = params.flatSize || 784;
               inputShape = `(${size},)`;
               break;
             case 'sequence':
-              const seqLen = params.seqLength || 100;
-              const features = params.features || 128;
+              seqLen = params.seqLength || 100;
+              features = params.features || 128;
               inputShape = `(${seqLen}, ${features})`;
               break;
             case 'custom':
@@ -127,7 +150,7 @@ function CanvasEditorInner({
         setNodes(updatedNodes)
       }
     } catch (error) {
-      console.error('Error computing shapes:', error)
+      console.error('Error computing shapes:', error instanceof Error ? error.message : 'Unknown error')
     }
   }, [setNodes])
 
@@ -183,34 +206,24 @@ function CanvasEditorInner({
 
   // Handle nodes changes with callback
   const handleNodesChange = useCallback(
-    (changes: any) => {
+    (changes: NodeChange[]) => {
       onNodesChangeInternal(changes)
-      
-      // Use a timeout to get the updated nodes after the changes are applied
-      setTimeout(() => {
-        setNodes(currentNodes => {
-          onNodesChange?.(currentNodes)
-          return currentNodes
-        })
-      }, 0)
+      if (onNodesChange) {
+        setTimeout(() => onNodesChange(nodes), 0)
+      }
     },
-    [onNodesChangeInternal, onNodesChange]
+    [onNodesChangeInternal, onNodesChange, nodes]
   )
 
   // Handle edges changes with callback
   const handleEdgesChange = useCallback(
-    (changes: any) => {
+    (changes: EdgeChange[]) => {
       onEdgesChangeInternal(changes)
-      
-      // Use a timeout to get the updated edges after the changes are applied
-      setTimeout(() => {
-        setEdges(currentEdges => {
-          onEdgesChange?.(currentEdges)
-          return currentEdges
-        })
-      }, 0)
+      if (onEdgesChange) {
+        setTimeout(() => onEdgesChange(edges), 0)
+      }
     },
-    [onEdgesChangeInternal, onEdgesChange]
+    [onEdgesChangeInternal, onEdgesChange, edges]
   )
 
   // Handle drag over event
@@ -228,11 +241,11 @@ function CanvasEditorInner({
       const layerType = event.dataTransfer.getData('layerType')
 
       // Check if the dropped element is valid
-      if (typeof layerType === 'undefined' || !layerType) {
+      if (typeof layerType === 'undefined' || !layerType || !reactFlowInstance) {
         return
       }
 
-      const position = reactFlowInstance?.screenToFlowPosition({
+      const position: XYPosition = reactFlowInstance.screenToFlowPosition({
         x: event.clientX - reactFlowBounds.left,
         y: event.clientY - reactFlowBounds.top,
       })
@@ -247,9 +260,9 @@ function CanvasEditorInner({
         },
       }
 
-      setNodes(currentNodes => [...currentNodes, newNode])
+      setNodes(nodes => [...nodes, newNode])
     },
-    [reactFlowInstance, setNodes, onNodesChange]
+    [reactFlowInstance, setNodes]
   )
 
   return (
