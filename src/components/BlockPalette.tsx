@@ -1,6 +1,7 @@
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from './ui/dialog'
-import { Trash2 } from 'lucide-react'
+import { Input } from './ui/input'
+import { Trash2, Search, X } from 'lucide-react'
 import { getLayerTypes } from '../lib/layer-defs'
 import { useState } from 'react'
 import type { Node, Edge } from '@xyflow/react'
@@ -97,6 +98,7 @@ export function BlockPalette({
   onClearAll 
 }: BlockPaletteProps) {
   const [showClearDialog, setShowClearDialog] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
   
   const handleDragStart = (event: React.DragEvent, layerType: string) => {
     event.dataTransfer.setData('layerType', layerType)
@@ -109,12 +111,19 @@ export function BlockPalette({
     setShowClearDialog(false)
   }
 
+  // Filter layers based on search term
+  const filteredCategories = layerCategories.map(category => ({
+    ...category,
+    layers: category.layers.filter(layer =>
+      layer.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      layer.description.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  })).filter(category => category.layers.length > 0)
+
+  const clearSearch = () => setSearchTerm('')
+
   return (
     <div className={`space-y-6 p-6 h-full overflow-y-auto bg-slate-50/80 ${className}`}>
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-slate-800 text-lg">Block Palette</h2>
-      </div>
-      
       {/* Clear All Button */}
       <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
         <DialogTrigger asChild>
@@ -146,34 +155,65 @@ export function BlockPalette({
         </DialogContent>
       </Dialog>
       
-      {layerCategories.map((category) => (
-        <div key={category.name} className="space-y-3">
-          <h3 className={`text-sm font-medium ${category.textColor} border-b border-slate-200 pb-1`}>
-            {category.name}
-          </h3>
-          <div className="space-y-2">
-            {category.layers.map((layer) => (
-              <div
-                key={layer.type}
-                className={`cursor-move hover:shadow-lg transition-all duration-300 hover:scale-[1.02] ${category.borderColor} ${category.bgColor} hover:shadow-slate-200 rounded-xl shadow-sm border-2 p-3`}
-                draggable
-                onDragStart={(event) => handleDragStart(event, layer.type)}
-                style={{ cursor: 'grab' }}
-                onMouseDown={(e) => e.currentTarget.style.cursor = 'grabbing'}
-                onMouseUp={(e) => e.currentTarget.style.cursor = 'grab'}
-              >
-                <div className={`flex items-center gap-2 mb-1 ${category.textColor}`}>
-                  <span className="text-base">{layer.icon}</span>
-                  <span className="font-medium text-sm">{layer.type}</span>
-                </div>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  {layer.description}
-                </p>
-              </div>
-            ))}
-          </div>
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-slate-800 text-lg">Block Palette</h2>
+      </div>
+      
+      {/* Search Input */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+        <Input
+          type="text"
+          placeholder="Search blocks..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10 pr-10"
+        />
+        {searchTerm && (
+          <button
+            onClick={clearSearch}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      
+      {filteredCategories.length === 0 && searchTerm ? (
+        <div className="text-center py-8 text-slate-500">
+          <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p>No blocks found matching "{searchTerm}"</p>
         </div>
-      ))}
+      ) : (
+        filteredCategories.map((category) => (
+          <div key={category.name} className="space-y-3">
+            <h3 className={`text-sm font-medium ${category.textColor} border-b border-slate-200 pb-1`}>
+              {category.name}
+            </h3>
+            <div className="space-y-2">
+              {category.layers.map((layer) => (
+                <div
+                  key={layer.type}
+                  className={`cursor-move hover:shadow-lg transition-all duration-300 hover:scale-[1.02] ${category.borderColor} ${category.bgColor} hover:shadow-slate-200 rounded-xl shadow-sm border-2 p-3`}
+                  draggable
+                  onDragStart={(event) => handleDragStart(event, layer.type)}
+                  style={{ cursor: 'grab' }}
+                  onMouseDown={(e) => e.currentTarget.style.cursor = 'grabbing'}
+                  onMouseUp={(e) => e.currentTarget.style.cursor = 'grab'}
+                >
+                  <div className={`flex items-center gap-2 mb-1 ${category.textColor}`}>
+                    <span className="text-base">{layer.icon}</span>
+                    <span className="font-medium text-sm">{layer.type}</span>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    {layer.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
       
     </div>
   )
