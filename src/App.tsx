@@ -3,12 +3,11 @@ import { CanvasEditor } from './components/CanvasEditor'
 import { BlockPalette } from './components/BlockPalette'
 import { CodeViewer } from './components/CodeViewer'
 import type { Node, Edge } from '@xyflow/react'
-import { useState } from 'react'
+import { useFlowStore } from './lib/flow-store'
 import './App.css'
 
 function App() {
-  const [nodes, setNodes] = useState<Node[]>([])
-  const [edges, setEdges] = useState<Edge[]>([])
+  const { nodes, edges, setNodes, setEdges } = useFlowStore()
 
   const handleClearAll = () => {
     setNodes([])
@@ -25,19 +24,11 @@ function App() {
   )
 
   const canvasContent = (
-    <CanvasEditor 
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={setNodes}
-      onEdgesChange={setEdges}
-    />
+    <CanvasEditor />
   )
 
   const codeViewerContent = (
-    <CodeViewer 
-      nodes={nodes}
-      edges={edges}
-    />
+    <CodeViewer />
   )
 
   return (

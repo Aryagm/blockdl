@@ -5,15 +5,14 @@ import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Copy, Check, Download } from 'lucide-react'
 import { parseGraphToDAG, generateKerasCode, generateFunctionalKerasCode } from '../lib/graph-utils'
-import type { Node, Edge } from '@xyflow/react'
+import { useFlowStore } from '../lib/flow-store'
 
 interface CodeViewerProps {
-  nodes: Node[]
-  edges: Edge[]
   className?: string
 }
 
-export function CodeViewer({ nodes, edges, className = '' }: CodeViewerProps) {
+export function CodeViewer({ className = '' }: CodeViewerProps) {
+  const { nodes, edges } = useFlowStore()
   const [generatedCode, setGeneratedCode] = useState<string>('')
   const [isCopied, setIsCopied] = useState(false)
   const [codeType, setCodeType] = useState<'sequential' | 'functional'>('sequential')
