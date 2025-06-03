@@ -21,11 +21,7 @@ function App() {
   }
 
   const paletteContent = (
-    <BlockPalette 
-      nodes={nodes}
-      edges={edges}
-      onClearAll={handleClearAll}
-    />
+    <BlockPalette />
   )
 
   const canvasContent = (
@@ -52,6 +48,7 @@ function App() {
       nodes={nodes}
       edges={edges}
       onImportProject={handleImportProject}
+      onClearAll={handleClearAll}
     />
   )
 }

@@ -11,6 +11,7 @@ interface AppShellProps {
   nodes?: Node[]
   edges?: Edge[]
   onImportProject?: (data: { nodes: Node[], edges: Edge[] }) => void
+  onClearAll?: () => void
 }
 
 export function AppShell({ 
@@ -20,7 +21,8 @@ export function AppShell({
   className,
   nodes = [],
   edges = [],
-  onImportProject
+  onImportProject,
+  onClearAll
 }: AppShellProps) {
   return (
     <div className={cn(
@@ -32,6 +34,7 @@ export function AppShell({
         nodes={nodes}
         edges={edges}
         onImportProject={onImportProject}
+        onClearAll={onClearAll}
       />
       
       {/* Main Content */}

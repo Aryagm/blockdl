@@ -1,6 +1,6 @@
 import { Button } from './ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog'
-import { Download, Upload, HelpCircle, Blocks } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from './ui/dialog'
+import { Download, Upload, HelpCircle, Blocks, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import type { Node, Edge } from '@xyflow/react'
 
@@ -8,14 +8,17 @@ interface AppHeaderProps {
   nodes?: Node[]
   edges?: Edge[]
   onImportProject?: (data: { nodes: Node[], edges: Edge[] }) => void
+  onClearAll?: () => void
 }
 
 export function AppHeader({ 
   nodes = [], 
   edges = [], 
-  onImportProject 
+  onImportProject,
+  onClearAll
 }: AppHeaderProps) {
   const [showHelpDialog, setShowHelpDialog] = useState(false)
+  const [showClearDialog, setShowClearDialog] = useState(false)
 
   const handleExportProject = () => {
     const projectData = {
@@ -66,6 +69,11 @@ export function AppHeader({
     input.click()
   }
 
+  const handleClearAll = () => {
+    onClearAll?.()
+    setShowClearDialog(false)
+  }
+
   return (
     <header className="bg-white border-b border-slate-200 shadow-sm px-6 py-3 flex items-center justify-between">
       {/* Left side - App Logo */}
@@ -78,6 +86,36 @@ export function AppHeader({
 
       {/* Right side - Actions */}
       <div className="flex items-center gap-2">
+        <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+          <DialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={nodes.length === 0 && edges.length === 0}
+              className="flex items-center gap-2 hover:bg-red-50 hover:border-red-200 hover:text-red-700"
+            >
+              <Trash2 className="h-4 w-4" />
+              Clear All
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Clear All Blocks</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to clear all blocks from the canvas? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowClearDialog(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleClearAll}>
+                Clear All
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Button
           variant="outline"
           size="sm"

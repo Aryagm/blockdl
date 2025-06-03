@@ -1,10 +1,7 @@
-import { Button } from './ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from './ui/dialog'
 import { Input } from './ui/input'
-import { Trash2, Search, X } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import { getLayerTypes } from '../lib/layer-defs'
 import { useState } from 'react'
-import type { Node, Edge } from '@xyflow/react'
 
 const layerTypes = getLayerTypes()
 
@@ -86,29 +83,17 @@ const layerCategories = [
 
 interface BlockPaletteProps {
   className?: string
-  nodes?: Node[]
-  edges?: Edge[]
-  onClearAll?: () => void
 }
 
 export function BlockPalette({ 
-  className = '', 
-  nodes = [], 
-  edges = [], 
-  onClearAll 
+  className = ''
 }: BlockPaletteProps) {
-  const [showClearDialog, setShowClearDialog] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   
   const handleDragStart = (event: React.DragEvent, layerType: string) => {
     event.dataTransfer.setData('layerType', layerType)
     event.dataTransfer.setData('application/reactflow', 'default')
     event.dataTransfer.effectAllowed = 'move'
-  }
-
-  const handleClearAll = () => {
-    onClearAll?.()
-    setShowClearDialog(false)
   }
 
   // Filter layers based on search term
@@ -124,37 +109,6 @@ export function BlockPalette({
 
   return (
     <div className={`space-y-6 p-6 h-full overflow-y-auto bg-slate-50/80 ${className}`}>
-      {/* Clear All Button */}
-      <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
-        <DialogTrigger asChild>
-          <Button
-            variant="destructive"
-            size="sm"
-            className="w-full"
-            disabled={nodes.length === 0 && edges.length === 0}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Clear All Blocks
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Clear All Blocks</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to clear all blocks from the canvas? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowClearDialog(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleClearAll}>
-              Clear All
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-slate-800 text-lg">Block Palette</h2>
       </div>
