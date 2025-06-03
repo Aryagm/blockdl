@@ -175,16 +175,6 @@ export function BlockPalette({
         </div>
       ))}
       
-      <div className="border-slate-200 bg-blue-50/50 rounded-xl shadow-sm border-2 p-3">
-        <div className="text-sm text-blue-700 flex items-center gap-2 mb-1">
-          <span>💡</span>
-          <span className="font-medium">How to use</span>
-        </div>
-        <p className="text-xs text-blue-600 leading-relaxed">
-          Drag and drop blocks onto the canvas to build your neural network architecture.
-          Double-click blocks to edit parameters, or click the trash icon to remove them.
-        </p>
-      </div>
     </div>
   )
 }

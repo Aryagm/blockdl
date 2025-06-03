@@ -344,8 +344,49 @@ export function generateFunctionalKerasCode(dagResult: DAGResult): string {
     const { id, type, params, varName } = layer
     
     if (type === 'Input') {
-      // Handle input layers
-      const shape = params.shape || '(784,)'
+      // Handle input layers - compute shape from inputType and dimensions
+      let shape = '(784,)' // fallback default
+      
+      if (params.inputType) {
+        // New input layer structure - compute shape from input type
+        const inputType = params.inputType;
+        switch (inputType) {
+          case 'image_grayscale':
+            const h1 = params.height || 28;
+            const w1 = params.width || 28;
+            shape = `(${h1}, ${w1}, 1)`;
+            break;
+          case 'image_color':
+            const h2 = params.height || 28;
+            const w2 = params.width || 28;
+            shape = `(${h2}, ${w2}, 3)`;
+            break;
+          case 'image_custom':
+            const h3 = params.height || 28;
+            const w3 = params.width || 28;
+            const c3 = params.channels || 1;
+            shape = `(${h3}, ${w3}, ${c3})`;
+            break;
+          case 'flat_data':
+            const size = params.flatSize || 784;
+            shape = `(${size},)`;
+            break;
+          case 'sequence':
+            const seqLen = params.seqLength || 100;
+            const features = params.features || 128;
+            shape = `(${seqLen}, ${features})`;
+            break;
+          case 'custom':
+            shape = params.customShape || '(784,)';
+            break;
+          default:
+            shape = '(784,)';
+        }
+      } else if (params.shape) {
+        // Legacy input layer with shape parameter
+        shape = params.shape;
+      }
+      
       codeLines.push(`${varName} = Input(shape=${shape})`)
       layerVariables.set(id, varName)
     } else {
@@ -363,41 +404,80 @@ export function generateFunctionalKerasCode(dagResult: DAGResult): string {
         }
       }
       
-      // Check if this is multi-line layer code (multiplier > 5)
+      // Check if this is multi-line layer code 
       const lines = layerCode.split('\n')
       const isMultiLine = lines.length > 1
       
       if (isMultiLine) {
-        // Handle multiplier > 5 case for Functional API with condensed approach
-        const commentLine = lines[0]
-        const spreadLine = lines[1]
+        // Check if it's multiplier > 5 (starts with comment) or multiplier <= 5 (comma-separated layers)
+        const firstLine = lines[0].trim()
+        const isCommentMultiplier = firstLine.startsWith('#')
+        const isCommaSeparatedMultiplier = layerCode.includes(',\n    ')
         
-        codeLines.push(`${commentLine}`)
-        
-        if (inputNodes.length === 0) {
-          codeLines.push(`# Warning: ${varName} has no inputs`)
-          codeLines.push(`${varName} = ${spreadLine}`)
-        } else if (inputNodes.length === 1) {
-          // Use a more readable loop approach
-          const match = spreadLine.match(/\*\[(.+?) for _ in range\((\d+)\)\]/)
-          if (match) {
-            const layerConstructor = match[1]
-            const count = parseInt(match[2])
-            
-            // Generate a for loop for better readability
-            codeLines.push(`${varName} = ${inputNodes[0]}`)
-            codeLines.push(`for _ in range(${count}):`)
-            codeLines.push(`    ${varName} = ${layerConstructor}(${varName})`)
-          }
-        } else {
-          // Multiple inputs - might need merge layer
-          if (type === 'Merge') {
-            codeLines.push(`${varName} = ${spreadLine}([${inputNodes.join(', ')}])`)
+        if (isCommentMultiplier) {
+          // Handle multiplier > 5 case for Functional API with condensed approach
+          const commentLine = lines[0]
+          const spreadLine = lines[1]
+          
+          codeLines.push(`${commentLine}`)
+          
+          if (inputNodes.length === 0) {
+            codeLines.push(`# Warning: ${varName} has no inputs`)
+            codeLines.push(`${varName} = ${spreadLine}`)
+          } else if (inputNodes.length === 1) {
+            // Use a more readable loop approach
+            const match = spreadLine.match(/\*\[(.+?) for _ in range\((\d+)\)\]/)
+            if (match) {
+              const layerConstructor = match[1]
+              const count = parseInt(match[2])
+              
+              // Generate a for loop for better readability
+              codeLines.push(`${varName} = ${inputNodes[0]}`)
+              codeLines.push(`for _ in range(${count}):`)
+              codeLines.push(`    ${varName} = ${layerConstructor}(${varName})`)
+            }
           } else {
-            codeLines.push(`${varName} = ${spreadLine}([${inputNodes.join(', ')}])`)
+            // Multiple inputs - might need merge layer
+            if (type === 'Merge') {
+              codeLines.push(`${varName} = ${spreadLine}([${inputNodes.join(', ')}])`)
+            } else {
+              codeLines.push(`${varName} = ${spreadLine}([${inputNodes.join(', ')}])`)
+            }
+          }
+        } else if (isCommaSeparatedMultiplier) {
+          // Handle multiplier <= 5 case - chain individual layers
+          const individualLayers = layerCode.split(',\n    ').map(layer => layer.trim())
+          
+          if (inputNodes.length === 0) {
+            codeLines.push(`# Warning: ${varName} has no inputs`)
+            codeLines.push(`${varName} = ${individualLayers[0]}`)
+          } else if (inputNodes.length === 1) {
+            let currentVar = inputNodes[0]
+            individualLayers.forEach((layer, index) => {
+              if (index === 0) {
+                codeLines.push(`${varName} = ${layer}(${currentVar})`)
+                currentVar = varName
+              } else {
+                const nextVarName = `${varName.replace(/\d+$/, '')}_${index}`
+                codeLines.push(`${nextVarName} = ${layer}(${currentVar})`)
+                currentVar = nextVarName
+                layerVariables.set(`${id}_${index}`, nextVarName)
+              }
+            })
+            // Update the final variable name
+            if (individualLayers.length > 1) {
+              const finalVarName = `${varName.replace(/\d+$/, '')}_${individualLayers.length - 1}`
+              layerVariables.set(id, finalVarName)
+            }
+          } else {
+            // Multiple inputs - handle as single layer for now
+            codeLines.push(`${varName} = ${individualLayers[0]}([${inputNodes.join(', ')}])`)
           }
         }
-        layerVariables.set(id, varName)
+        
+        if (!isCommaSeparatedMultiplier) {
+          layerVariables.set(id, varName)
+        }
       } else {
         // Single line layer code - handle normally
         if (inputNodes.length === 0) {

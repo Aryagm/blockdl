@@ -15,6 +15,11 @@ function App() {
     setEdges([])
   }
 
+  const handleImportProject = (data: { nodes: Node[], edges: Edge[] }) => {
+    setNodes(data.nodes)
+    setEdges(data.edges)
+  }
+
   const paletteContent = (
     <BlockPalette 
       nodes={nodes}
@@ -44,6 +49,9 @@ function App() {
       palette={paletteContent}
       canvas={canvasContent} 
       codeViewer={codeViewerContent}
+      nodes={nodes}
+      edges={edges}
+      onImportProject={handleImportProject}
     />
   )
 }
