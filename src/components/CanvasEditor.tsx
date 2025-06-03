@@ -208,22 +208,32 @@ function CanvasEditorInner({
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       onNodesChangeInternal(changes)
-      if (onNodesChange) {
-        setTimeout(() => onNodesChange(nodes), 0)
-      }
+      // Let React Flow handle the internal state changes first
+      // Then notify parent component with the updated state
+      setTimeout(() => {
+        if (onNodesChange && reactFlowInstance) {
+          const currentNodes = reactFlowInstance.getNodes()
+          onNodesChange(currentNodes)
+        }
+      }, 0)
     },
-    [onNodesChangeInternal, onNodesChange, nodes]
+    [onNodesChangeInternal, onNodesChange, reactFlowInstance]
   )
 
   // Handle edges changes with callback
   const handleEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
       onEdgesChangeInternal(changes)
-      if (onEdgesChange) {
-        setTimeout(() => onEdgesChange(edges), 0)
-      }
+      // Let React Flow handle the internal state changes first
+      // Then notify parent component with the updated state
+      setTimeout(() => {
+        if (onEdgesChange && reactFlowInstance) {
+          const currentEdges = reactFlowInstance.getEdges()
+          onEdgesChange(currentEdges)
+        }
+      }, 0)
     },
-    [onEdgesChangeInternal, onEdgesChange, edges]
+    [onEdgesChangeInternal, onEdgesChange, reactFlowInstance]
   )
 
   // Handle drag over event
@@ -260,9 +270,18 @@ function CanvasEditorInner({
         },
       }
 
-      setNodes(nodes => [...nodes, newNode])
+      setNodes(nodes => {
+        const updatedNodes = [...nodes, newNode]
+        // Notify parent component about the change
+        setTimeout(() => {
+          if (onNodesChange) {
+            onNodesChange(updatedNodes)
+          }
+        }, 0)
+        return updatedNodes
+      })
     },
-    [reactFlowInstance, setNodes]
+    [reactFlowInstance, setNodes, onNodesChange]
   )
 
   return (
