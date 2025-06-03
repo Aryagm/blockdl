@@ -3,7 +3,7 @@ import CodeMirror from '@uiw/react-codemirror'
 import { python } from '@codemirror/lang-python'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Copy, Check } from 'lucide-react'
+import { Copy, Check, Download } from 'lucide-react'
 import { parseGraphToDAG, generateKerasCode, generateFunctionalKerasCode } from '../lib/graph-utils'
 import type { Node, Edge } from '@xyflow/react'
 
@@ -67,88 +67,106 @@ export function CodeViewer({ nodes, edges, className = '' }: CodeViewerProps) {
     }
   }
 
-  return (
-    <div className={`space-y-6 p-6 h-full overflow-y-auto bg-slate-50/80 ${className}`}>
-      <Card className="border-slate-200 bg-white shadow-sm rounded-xl">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
-              <span>🐍</span>
-              Generated Keras Code
-              <span className={`text-xs px-2 py-1 rounded-full font-mono ${
-                codeType === 'functional' 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'bg-green-100 text-green-700'
-              }`}>
-                {codeType === 'functional' ? 'Functional API' : 'Sequential API'}
-              </span>
-            </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyCode}
-              disabled={!generatedCode.trim()}
-              className={`h-9 px-4 rounded-lg transition-all duration-200 shadow-sm ${
-                isCopied 
-                  ? 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100' 
-                  : 'border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-              }`}
-            >
-              {isCopied ? (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy Code
-                </>
-              )}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="rounded-xl overflow-hidden border border-slate-200 shadow-inner">
-            <div className="text-left">
-              <CodeMirror
-                value={generatedCode}
-                height="400px"
-                extensions={[python()]}
-                editable={false}
-                style={{ textAlign: 'left' }}
-                basicSetup={{
-                  lineNumbers: true,
-                  foldGutter: true,
-                  dropCursor: false,
-                  allowMultipleSelections: false,
-                  indentOnInput: false,
-                  bracketMatching: true,
-                  closeBrackets: false,
-                  autocompletion: false,
-                  highlightSelectionMatches: false,
-                  searchKeymap: false,
-                }}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+  const handleDownloadCode = () => {
+    if (!generatedCode.trim()) return
+    
+    const blob = new Blob([generatedCode], { type: 'text/python' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `keras_model_${codeType}.py`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 
-      <Card className="border-slate-200 bg-blue-50/50 rounded-xl shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm text-blue-700 flex items-center gap-2">
-            <span>⚡</span>
-            Code Generation
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <p className="text-xs text-blue-600">
-            Connect blocks from Input to Output to generate valid Keras code. 
-            The code updates automatically as you modify your network structure.
-          </p>
-        </CardContent>
-      </Card>
+  return (
+    <div className={`h-full flex flex-col bg-slate-50/80 ${className}`}>
+      <div className="flex-1 flex flex-col p-4 sm:p-6 min-h-0">
+        <Card className="border-slate-200 bg-white shadow-sm rounded-xl flex-1 flex flex-col min-h-0">
+          <CardHeader className="pb-3 px-4 sm:px-6 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🐍</span>
+                  <CardTitle className="text-xl text-slate-800 font-semibold">
+                    Keras Code
+                  </CardTitle>
+                </div>
+                <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${
+                  codeType === 'functional' 
+                    ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                    : 'bg-green-100 text-green-700 border border-green-200'
+                }`}>
+                  {codeType === 'functional' ? 'Functional API' : 'Sequential API'}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadCode}
+                  disabled={!generatedCode.trim()}
+                  className="h-9 px-4 rounded-lg transition-all duration-200 shadow-sm border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:shadow-md"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download .py
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyCode}
+                  disabled={!generatedCode.trim()}
+                  className={`h-9 px-4 rounded-lg transition-all duration-200 shadow-sm ${
+                    isCopied 
+                      ? 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100 shadow-md' 
+                      : 'border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:shadow-md'
+                  }`}
+                >
+                  {isCopied ? (
+                    <>
+                      <Check className="h-4 w-4 mr-2" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy Code
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0 px-4 sm:px-6 pb-3 flex-1 flex flex-col min-h-0">
+            <div className="rounded-xl border border-slate-200 shadow-inner bg-slate-50/30 flex-1 min-h-0">
+              <div className="w-full h-full overflow-auto">
+                <CodeMirror
+                  value={generatedCode}
+                  height="100%"
+                  extensions={[python()]}
+                  editable={false}
+                  basicSetup={{
+                    lineNumbers: true,
+                    foldGutter: true,
+                    dropCursor: false,
+                    allowMultipleSelections: false,
+                    indentOnInput: false,
+                    bracketMatching: true,
+                    closeBrackets: false,
+                    autocompletion: false,
+                    highlightSelectionMatches: false,
+                    searchKeymap: false,
+                  }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
