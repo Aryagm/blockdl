@@ -4,10 +4,11 @@
  */
 
 import yaml from 'js-yaml'
-import type { LayerDef, LayerFormField } from './layer-defs'
+import type { LayerDef, LayerFormField, LayerParamValue } from './layer-defs'
+import { layerDefs } from './layer-defs'
 
-// Define a type for parameter values
-type ParamValue = string | number | boolean
+// Define a type for parameter values - use the shared type
+type ParamValue = LayerParamValue
 
 // YAML configuration interfaces
 interface YAMLLayerConfig {
@@ -50,7 +51,6 @@ interface YAMLLayer {
   keras: {
     import: string
     code_template: string
-    multiplier_template?: string
     shape_computation: string
   }
 }
@@ -74,27 +74,64 @@ interface YAMLParameter {
  * Convert YAML parameter to LayerFormField format
  */
 function convertParameter(key: string, param: YAMLParameter): LayerFormField {
+  const { label, type, options, validation, show_when } = param
+  
   const field: LayerFormField = {
     key,
-    label: param.label,
-    type: param.type,
-    ...(param.options && { options: param.options }),
-    ...(param.validation?.min !== undefined && { min: param.validation.min }),
-    ...(param.validation?.max !== undefined && { max: param.validation.max }),
-    ...(param.validation?.step !== undefined && { step: param.validation.step })
+    label,
+    type,
+    ...(options && { options }),
+    ...(validation?.min !== undefined && { min: validation.min }),
+    ...(validation?.max !== undefined && { max: validation.max }),
+    ...(validation?.step !== undefined && { step: validation.step })
   }
 
   // Convert show_when conditions to show function
-  if (param.show_when) {
+  if (show_when) {
     field.show = (params: Record<string, ParamValue>) => {
-      return Object.entries(param.show_when!).some(([paramKey, values]) => {
-        const paramValue = params[paramKey]
-        return values.includes(String(paramValue))
+      return Object.entries(show_when).some(([paramKey, values]) => {
+        return values.includes(String(params[paramKey]))
       })
     }
   }
 
   return field
+}
+
+/**
+ * Handle computed values based on shape computation type
+ */
+function handleComputedValue(varName: string, params: Record<string, ParamValue>): string {
+  switch (varName) {
+    case 'computed_shape':
+      return computeInputShape(params)
+    case 'computed_units':
+      return computeOutputUnits(params).toString()
+    case 'computed_activation':
+      return computeOutputActivation(params)
+    default:
+      return `{{${varName}}}`
+  }
+}
+
+/**
+ * Handle multiplier logic for code generation
+ */
+function handleMultiplier(code: string, params: Record<string, ParamValue>, layerName: string): string {
+  const multiplier = Number(params.multiplier) || 1
+  if (multiplier <= 1) {
+    return code.trim()
+  }
+
+  const baseCode = code.trim()
+  
+  if (multiplier <= 5) {
+    // For small multipliers, generate individual layers
+    return Array(multiplier).fill(baseCode).join(',\n    ')
+  } else {
+    // For large multipliers, use Python list comprehension
+    return `# Add ${multiplier} ${layerName} layers\n    *[${baseCode} for _ in range(${multiplier})]`
+  }
 }
 
 /**
@@ -107,66 +144,26 @@ function generateCodeFromTemplate(
 ): string {
   let code = template
   
-  // Handle special computed values
+  // Handle template variables with computed values
   code = code.replace(/{{\s*(\w+)\s*}}/g, (_match, varName) => {
-    if (varName === 'computed_shape') {
-      return computeInputShape(params)
+    // Handle computed values
+    if (varName.startsWith('computed_')) {
+      return handleComputedValue(varName, params)
     }
-    if (varName === 'computed_units') {
-      return computeOutputUnits(params).toString()
-    }
-    if (varName === 'computed_activation') {
-      return computeOutputActivation(params)
-    }
+    
+    // Handle activation suffix
     if (varName === 'activation_suffix') {
       const activation = params.activation
       return activation && activation !== 'none' ? `, activation='${activation}'` : ''
     }
     
+    // Handle regular parameter values
     const value = params[varName]
     return value !== undefined ? value.toString() : `{{${varName}}}`
   })
 
   // Handle multiplier logic
-  const multiplier = Number(params.multiplier) || 1
-  if (multiplier > 1) {
-    const baseCode = code.trim()
-    
-    if (multiplier <= 5) {
-      // For small multipliers, generate individual layers
-      return Array(multiplier).fill(baseCode).join(',\n    ')
-    } else {
-      // For large multipliers, use Python list comprehension
-      const layerType = layerName
-      const description = getMultiplierDescription(layerType, params)
-      return `# Add ${multiplier} ${layerType} layers${description}\n    *[${baseCode} for _ in range(${multiplier})]`
-    }
-  }
-
-  return code.trim()
-}
-
-/**
- * Get description for multiplier comment
- */
-function getMultiplierDescription(layerType: string, params: Record<string, ParamValue>): string {
-  switch (layerType) {
-    case 'Dense': {
-      const units = params.units || 128
-      const activation = params.activation
-      return ` with ${units} units${activation && activation !== 'none' ? ` and ${activation} activation` : ''}`
-    }
-    case 'Conv2D': {
-      const filters = params.filters || 32
-      return ` with ${filters} filters`
-    }
-    case 'LSTM': {
-      const lstmUnits = params.units || 128
-      return ` with ${lstmUnits} units`
-    }
-    default:
-      return ''
-  }
+  return handleMultiplier(code, params, layerName)
 }
 
 /**
@@ -257,14 +254,14 @@ function computeOutputActivation(params: Record<string, ParamValue>): string {
  * Convert YAML layer to LayerDef format
  */
 function convertYAMLLayer(layerName: string, yamlLayer: YAMLLayer): LayerDef {
-  // Convert parameters to formSpec
-  const formSpec: LayerFormField[] = Object.entries(yamlLayer.parameters).map(
-    ([key, param]) => convertParameter(key, param)
-  )
-
-  // Extract default parameters
+  const { metadata, parameters, keras, features } = yamlLayer
+  
+  // Convert parameters to formSpec and extract defaults
+  const formSpec: LayerFormField[] = []
   const defaultParams: Record<string, ParamValue> = {}
-  Object.entries(yamlLayer.parameters).forEach(([key, param]) => {
+  
+  Object.entries(parameters).forEach(([key, param]) => {
+    formSpec.push(convertParameter(key, param))
     if (param.default !== undefined) {
       defaultParams[key] = param.default
     }
@@ -272,19 +269,15 @@ function convertYAMLLayer(layerName: string, yamlLayer: YAMLLayer): LayerDef {
 
   return {
     type: layerName,
-    icon: yamlLayer.metadata.icon,
-    description: yamlLayer.metadata.description,
+    icon: metadata.icon,
+    description: metadata.description,
     defaultParams,
     formSpec,
     codeGen: (params: Record<string, ParamValue>) => {
-      return generateCodeFromTemplate(
-        yamlLayer.keras.code_template,
-        params,
-        layerName
-      )
+      return generateCodeFromTemplate(keras.code_template, params, layerName)
     },
-    kerasImport: yamlLayer.keras.import,
-    supportsMultiplier: yamlLayer.features?.supports_multiplier || false
+    kerasImport: keras.import,
+    supportsMultiplier: features?.supports_multiplier || false
   }
 }
 
@@ -334,9 +327,6 @@ export async function initializeLayerDefs(): Promise<void> {
     
     const yamlContent = await response.text()
     const loadedLayerDefs = await loadLayersFromYAML(yamlContent)
-    
-    // Import and populate the layerDefs object
-    const { layerDefs } = await import('./layer-defs')
     
     // Clear existing definitions and add loaded ones
     Object.keys(layerDefs).forEach(key => delete layerDefs[key])
