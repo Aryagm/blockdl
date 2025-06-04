@@ -1,96 +1,99 @@
+/**
+ * AppShell Component
+ * 
+ * Main layout shell for the BlockDL application providing a three-panel layout:
+ * - Left sidebar for block palette
+ * - Center area for canvas editor
+ * - Right sidebar for code viewer
+ * 
+ * Features a fixed minimum width to ensure proper functionality across all panels.
+ */
+
 import { type ReactNode } from 'react'
+
 import { cn } from '@/lib/utils'
 import { AppHeader } from './AppHeader'
+
 import type { Node, Edge } from '@xyflow/react'
 
+/**
+ * Props for the AppShell component
+ */
 interface AppShellProps {
+  /** React component for the left sidebar block palette */
   palette?: ReactNode
+  /** React component for the center canvas editor */
   canvas?: ReactNode
+  /** React component for the right sidebar code viewer */
   codeViewer?: ReactNode
+  /** Additional CSS classes to apply to the root container */
   className?: string
+  /** Array of flow nodes for the current project */
   nodes?: Node[]
+  /** Array of flow edges for the current project */
   edges?: Edge[]
-  onImportProject?: (data: { nodes: Node[], edges: Edge[] }) => void
+  /** Callback fired when importing a project */
+  onImportProject?: (data: { nodes: Node[]; edges: Edge[] }) => void
+  /** Callback fired when clearing all project data */
   onClearAll?: () => void
 }
 
-export function AppShell({ 
-  palette, 
-  canvas, 
-  codeViewer, 
+/**
+ * AppShell - Main Application Layout Component
+ * 
+ * Provides the core three-panel layout structure for the BlockDL application.
+ * Manages responsive design and overflow behavior for optimal user experience.
+ * 
+ * @param props - The component props
+ * @returns The rendered application shell
+ */
+export function AppShell({
+  palette,
+  canvas,
+  codeViewer,
   className,
   nodes = [],
   edges = [],
   onImportProject,
-  onClearAll
+  onClearAll,
 }: AppShellProps) {
   return (
-    <div className={cn(
-      "flex flex-col h-screen bg-slate-100 text-slate-900 min-w-[1280px]",
-      className
-    )}>
-      {/* Header */}
-      <AppHeader 
+    <div
+      className={cn(
+        "flex flex-col h-screen bg-slate-100 text-slate-900 min-w-[1280px]",
+        className
+      )}
+    >
+      {/* Application Header */}
+      <AppHeader
         nodes={nodes}
         edges={edges}
         onImportProject={onImportProject}
         onClearAll={onClearAll}
       />
-      
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar - Palette */}
-        <div className="w-72 bg-white border-r border-slate-200 flex-shrink-0 shadow-sm">
-          <div className="h-full overflow-hidden">
-            {palette || (
-              <div className="p-6">
-                <h2 className="font-semibold mb-4 text-slate-800">Palette</h2>
-                <div className="space-y-3">
-                  <div className="p-3 bg-slate-50 rounded-xl text-slate-700 border border-slate-200">
-                    Palette Item 1
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl text-slate-700 border border-slate-200">
-                    Palette Item 2
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl text-slate-700 border border-slate-200">
-                    Palette Item 3
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* Center - Canvas */}
-        <div className="flex-grow bg-white min-w-0">
-          <div className="h-full">
-            {canvas || (
-              <div className="h-full flex items-center justify-center border-2 border-dashed border-slate-300 rounded-xl m-4">
-                <div className="text-center text-slate-500">
-                  <h2 className="text-2xl font-semibold mb-2 text-slate-700">Canvas Area</h2>
-                  <p>Your main content goes here</p>
-                </div>
-              </div>
-            )}
+      {/* Main Content Area - Three Panel Layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar - Block Palette */}
+        <aside className="w-72 bg-white border-r border-slate-200 flex-shrink-0 shadow-sm">
+          <div className="h-full overflow-hidden">
+            {palette}
           </div>
-        </div>
+        </aside>
+
+        {/* Center Panel - Canvas Editor */}
+        <main className="flex-grow bg-white min-w-0">
+          <div className="h-full">
+            {canvas}
+          </div>
+        </main>
 
         {/* Right Sidebar - Code Viewer */}
-        <div className="w-[500px] bg-white border-l border-slate-200 flex-shrink-0 shadow-sm">
+        <aside className="w-[500px] bg-white border-l border-slate-200 flex-shrink-0 shadow-sm">
           <div className="h-full overflow-hidden">
-            {codeViewer || (
-              <div className="p-6">
-                <h2 className="font-semibold mb-4 text-slate-800">Code Viewer</h2>
-                <div className="bg-slate-50 rounded-xl p-4 text-slate-700 font-mono text-sm border border-slate-200">
-                  <pre>{`// Example code
-function example() {
-  console.log("Hello world!");
-}`}</pre>
-                </div>
-              </div>
-            )}
+            {codeViewer}
           </div>
-        </div>
+        </aside>
       </div>
     </div>
   )

@@ -37,9 +37,7 @@ interface CanvasEditorProps {
 function CanvasEditorInner({ 
   className = '',
   nodes: propNodes = [],
-  edges: propEdges = [],
-  onNodesChange,
-  onEdgesChange 
+  edges: propEdges = []
 }: CanvasEditorProps) {
   const { 
     nodes, 
@@ -63,19 +61,6 @@ function CanvasEditorInner({
       setEdges(propEdges)
     }
   }, [nodes.length, edges.length, propNodes, propEdges, setNodes, setEdges])
-
-  // Notify parent when store state changes (for backwards compatibility)
-  useEffect(() => {
-    if (onNodesChange) {
-      onNodesChange(nodes)
-    }
-  }, [nodes, onNodesChange])
-
-  useEffect(() => {
-    if (onEdgesChange) {
-      onEdgesChange(edges)
-    }
-  }, [edges, onEdgesChange])
 
   // Prevent all delete key functionality
   useEffect(() => {
