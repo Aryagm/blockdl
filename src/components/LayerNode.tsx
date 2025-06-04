@@ -183,36 +183,43 @@ export function LayerNode({ id, data }: LayerNodeProps) {
     let displayShape = ''
     
     switch (inputType) {
-      case 'image_grayscale':
+      case 'image_grayscale': {
         const h1 = params.height || 28
         const w1 = params.width || 28
         displayShape = `${h1}×${w1}×1`
         break
-      case 'image_color':
+      }
+      case 'image_color': {
         const h2 = params.height || 28
         const w2 = params.width || 28
         displayShape = `${h2}×${w2}×3`
         break
-      case 'image_custom':
+      }
+      case 'image_custom': {
         const h3 = params.height || 28
         const w3 = params.width || 28
         const c3 = params.channels || 1
         displayShape = `${h3}×${w3}×${c3}`
         break
-      case 'flat_data':
+      }
+      case 'flat_data': {
         const size = params.flatSize || 784
         displayShape = `${size}`
         break
-      case 'sequence':
+      }
+      case 'sequence': {
         const seqLen = params.seqLength || 100
         const features = params.features || 128
         displayShape = `${seqLen}×${features}`
         break
-      case 'custom':
+      }
+      case 'custom': {
         displayShape = params.customShape || '784'
         break
-      default:
+      }
+      default: {
         displayShape = '28×28×1'
+      }
     }
     
     visibleParams.push(`shape: ${displayShape}`)
@@ -237,6 +244,18 @@ export function LayerNode({ id, data }: LayerNodeProps) {
     visibleParams.push(`${params.type}`)
   }
   
+  // For Merge layers, show the merge mode prominently
+  if (type === 'Merge' && params.mode) {
+    const modeLabels: Record<string, string> = {
+      'concat': 'Concatenate',
+      'add': 'Add',
+      'multiply': 'Multiply',
+      'average': 'Average',
+      'maximum': 'Maximum'
+    }
+    visibleParams.push(modeLabels[params.mode as string] || params.mode)
+  }
+  
   // For Output layers, show output configuration instead of raw parameters
   if (type === 'Output') {
     const outputType = params.outputType || 'multiclass'
@@ -249,36 +268,42 @@ export function LayerNode({ id, data }: LayerNodeProps) {
     }
     
     switch (outputType) {
-      case 'multiclass':
+      case 'multiclass': {
         const numClasses = params.numClasses || 10
         visibleParams.push(`${numClasses} classes`)
         visibleParams.push('softmax')
         break
-      case 'binary':
+      }
+      case 'binary': {
         visibleParams.push('1 unit')
         visibleParams.push('sigmoid')
         if (params.threshold && params.threshold !== 0.5) {
           visibleParams.push(`threshold: ${params.threshold}`)
         }
         break
-      case 'regression':
+      }
+      case 'regression': {
         const regUnits = params.units || 1
         visibleParams.push(`${regUnits} output${regUnits > 1 ? 's' : ''}`)
         visibleParams.push('linear')
         break
-      case 'multilabel':
+      }
+      case 'multilabel': {
         const mlUnits = params.units || 10
         visibleParams.push(`${mlUnits} labels`)
         visibleParams.push('sigmoid')
         break
-      case 'custom':
+      }
+      case 'custom': {
         const customUnits = params.units || 10
         const customActivation = params.activation || 'softmax'
         visibleParams.push(`${customUnits} units`)
         visibleParams.push(customActivation)
         break
-      default:
+      }
+      default: {
         visibleParams.push(outputTypeLabels[outputType] || outputType)
+      }
     }
   }
   

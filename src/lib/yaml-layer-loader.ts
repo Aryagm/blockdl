@@ -144,6 +144,22 @@ function generateCodeFromTemplate(
 ): string {
   let code = template
   
+  // Handle Jinja2-like conditional statements for Merge layer
+  if (layerName === 'Merge') {
+    const mode = params.mode || 'concat'
+    
+    // Process conditional blocks
+    code = code.replace(
+      /\{%\s*if\s+mode\s*==\s*["'](\w+)["']\s*%\}([^{]+)\{%\s*endif\s*%\}/g,
+      (match, conditionMode, content) => {
+        return mode === conditionMode ? content.trim() : ''
+      }
+    )
+    
+    // Remove any remaining empty lines
+    code = code.split('\n').filter(line => line.trim() !== '').join('\n').trim()
+  }
+  
   // Handle template variables with computed values
   code = code.replace(/{{\s*(\w+)\s*}}/g, (_match, varName) => {
     // Handle computed values
