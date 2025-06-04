@@ -1,4 +1,5 @@
 import type { Node, Edge } from '@xyflow/react'
+import { Graph, alg } from 'graphlib'
 import { generateLayerCode, getUsedKerasImports } from './layer-defs'
 
 export interface LayerObject {
@@ -23,6 +24,7 @@ export interface ShapeError {
 /**
  * Parses a graph into a DAG structure with unique variable names for code generation.
  * Returns ordered nodes, edge map, and validation information.
+ * Uses graphlib for robust cycle detection and topological sorting.
  */
 export function parseGraphToDAG(nodes: Node[], edges: Edge[]): DAGResult {
   const errors: string[] = []
@@ -36,41 +38,29 @@ export function parseGraphToDAG(nodes: Node[], edges: Edge[]): DAGResult {
     }
   }
 
+  // Create graphlib Graph instance
+  const graph = new Graph({ directed: true })
+  
   // Convert nodes to a map for easy lookup
   const nodeMap = new Map<string, Node>()
-  nodes.forEach(node => nodeMap.set(node.id, node))
-
-  // Build adjacency lists
-  const outgoing = new Map<string, string[]>()
-  const incoming = new Map<string, string[]>()
-  
-  // Initialize maps
   nodes.forEach(node => {
-    outgoing.set(node.id, [])
-    incoming.set(node.id, [])
+    nodeMap.set(node.id, node)
+    graph.setNode(node.id)
   })
 
-  // Populate adjacency lists
+  // Add edges to the graph
   edges.forEach(edge => {
-    const sourceConnections = outgoing.get(edge.source) || []
-    sourceConnections.push(edge.target)
-    outgoing.set(edge.source, sourceConnections)
-
-    const targetConnections = incoming.get(edge.target) || []
-    targetConnections.push(edge.source)
-    incoming.set(edge.target, targetConnections)
+    graph.setEdge(edge.source, edge.target)
   })
 
   // Find input nodes (nodes with no incoming edges)
   const inputNodes = nodes.filter(node => {
-    const incomingEdges = incoming.get(node.id) || []
-    return incomingEdges.length === 0
+    return graph.inEdges(node.id)?.length === 0
   })
 
   // Find output nodes (nodes with no outgoing edges)
   const outputNodes = nodes.filter(node => {
-    const outgoingEdges = outgoing.get(node.id) || []
-    return outgoingEdges.length === 0
+    return graph.outEdges(node.id)?.length === 0
   })
 
   // Validate input/output structure
@@ -81,38 +71,9 @@ export function parseGraphToDAG(nodes: Node[], edges: Edge[]): DAGResult {
     errors.push('Network must have at least one Output layer')
   }
 
-  // Check for cycles using DFS
-  const visited = new Set<string>()
-  const recursionStack = new Set<string>()
-  
-  function hasCycle(nodeId: string): boolean {
-    if (recursionStack.has(nodeId)) {
-      return true // Back edge found - cycle detected
-    }
-    if (visited.has(nodeId)) {
-      return false // Already processed
-    }
-
-    visited.add(nodeId)
-    recursionStack.add(nodeId)
-
-    const neighbors = outgoing.get(nodeId) || []
-    for (const neighbor of neighbors) {
-      if (hasCycle(neighbor)) {
-        return true
-      }
-    }
-
-    recursionStack.delete(nodeId)
-    return false
-  }
-
-  // Check for cycles starting from all unvisited nodes
-  for (const node of nodes) {
-    if (!visited.has(node.id) && hasCycle(node.id)) {
-      errors.push('Network contains cycles - DAG structure required')
-      break
-    }
+  // Check for cycles using graphlib's isAcyclic function
+  if (!alg.isAcyclic(graph)) {
+    errors.push('Network contains cycles - DAG structure required')
   }
 
   // If there are validation errors, return early
@@ -125,20 +86,9 @@ export function parseGraphToDAG(nodes: Node[], edges: Edge[]): DAGResult {
     }
   }
 
-  // Perform topological sort using Kahn's algorithm
-  const orderedNodes: LayerObject[] = []
-  const inDegree = new Map<string, number>()
-  const queue: string[] = []
+  // Perform topological sort using graphlib
+  const topologicalOrder = alg.topsort(graph)
   
-  // Initialize in-degree count
-  nodes.forEach(node => {
-    const incomingEdges = incoming.get(node.id) || []
-    inDegree.set(node.id, incomingEdges.length)
-    if (incomingEdges.length === 0) {
-      queue.push(node.id)
-    }
-  })
-
   // Generate unique variable names
   const typeCounters = new Map<string, number>()
   
@@ -152,47 +102,30 @@ export function parseGraphToDAG(nodes: Node[], edges: Edge[]): DAGResult {
     return `${type.toLowerCase()}_${counter}`
   }
 
-  // Process nodes in topological order
-  while (queue.length > 0) {
-    const nodeId = queue.shift()!
+  // Create ordered LayerObjects
+  const orderedNodes: LayerObject[] = topologicalOrder.map(nodeId => {
     const node = nodeMap.get(nodeId)!
+    const nodeData = node.data as { type: string; params?: Record<string, unknown> }
     
-    // Create layer object with unique variable name
-    const layerObject: LayerObject = {
-      id: node.id,
-      type: (node.data as any).type,
-      params: (node.data as any).params || {},
-      varName: generateVarName((node.data as any).type)
-    }
-    
-    orderedNodes.push(layerObject)
-
-    // Update in-degrees of neighboring nodes
-    const neighbors = outgoing.get(nodeId) || []
-    for (const neighbor of neighbors) {
-      const currentInDegree = inDegree.get(neighbor)!
-      inDegree.set(neighbor, currentInDegree - 1)
-      
-      if (currentInDegree - 1 === 0) {
-        queue.push(neighbor)
-      }
-    }
-  }
-
-  // Verify all nodes were processed (no cycles)
-  if (orderedNodes.length !== nodes.length) {
-    errors.push('Unable to create topological ordering - network may contain cycles')
     return {
-      orderedNodes: [],
-      edgeMap: new Map(),
-      isValid: false,
-      errors
+      id: node.id,
+      type: nodeData.type,
+      params: nodeData.params || {},
+      varName: generateVarName(nodeData.type)
     }
-  }
+  })
+
+  // Build edge map for compatibility with existing code
+  const edgeMap = new Map<string, string[]>()
+  nodes.forEach(node => {
+    const outgoingEdges = graph.outEdges(node.id) || []
+    const targets = outgoingEdges.map(edge => edge.w)
+    edgeMap.set(node.id, targets)
+  })
 
   return {
     orderedNodes,
-    edgeMap: outgoing,
+    edgeMap,
     isValid: true,
     errors: []
   }
