@@ -1,94 +1,116 @@
 import { Input } from './ui/input'
 import { Search, X } from 'lucide-react'
 import { getLayerTypes } from '../lib/layer-defs'
-import { useState } from 'react'
-
-const layerTypes = getLayerTypes()
-
-// Group layers by category with color coding
-const layerCategories = [
-  {
-    name: 'Input/Output',
-    color: 'emerald',
-    bgColor: 'bg-emerald-50',
-    borderColor: 'border-emerald-200',
-    textColor: 'text-emerald-700',
-    layers: layerTypes.filter(layer => ['Input', 'Output'].includes(layer.type))
-  },
-  {
-    name: 'Dense Layers',
-    color: 'blue',
-    bgColor: 'bg-blue-50',
-    borderColor: 'border-blue-200',
-    textColor: 'text-blue-700',
-    layers: layerTypes.filter(layer => ['Dense'].includes(layer.type))
-  },
-  {
-    name: 'Convolutional',
-    color: 'purple',
-    bgColor: 'bg-purple-50',
-    borderColor: 'border-purple-200',
-    textColor: 'text-purple-700',
-    layers: layerTypes.filter(layer => ['Conv2D', 'Conv2DTranspose'].includes(layer.type))
-  },
-  {
-    name: 'Pooling',
-    color: 'indigo',
-    bgColor: 'bg-indigo-50',
-    borderColor: 'border-indigo-200',
-    textColor: 'text-indigo-700',
-    layers: layerTypes.filter(layer => ['MaxPool2D', 'GlobalAvgPool', 'UpSampling2D'].includes(layer.type))
-  },
-  {
-    name: 'Transformation',
-    color: 'amber',
-    bgColor: 'bg-amber-50',
-    borderColor: 'border-amber-200',
-    textColor: 'text-amber-700',
-    layers: layerTypes.filter(layer => ['Flatten'].includes(layer.type))
-  },
-  {
-    name: 'Activation',
-    color: 'orange',
-    bgColor: 'bg-orange-50',
-    borderColor: 'border-orange-200',
-    textColor: 'text-orange-700',
-    layers: layerTypes.filter(layer => ['Activation'].includes(layer.type))
-  },
-  {
-    name: 'Regularization',
-    color: 'rose',
-    bgColor: 'bg-rose-50',
-    borderColor: 'border-rose-200',
-    textColor: 'text-rose-700',
-    layers: layerTypes.filter(layer => ['BatchNorm', 'Dropout'].includes(layer.type))
-  },
-  {
-    name: 'Sequence',
-    color: 'cyan',
-    bgColor: 'bg-cyan-50',
-    borderColor: 'border-cyan-200',
-    textColor: 'text-cyan-700',
-    layers: layerTypes.filter(layer => ['Embedding', 'LSTM', 'GRU'].includes(layer.type))
-  },
-  {
-    name: 'Merge',
-    color: 'teal',
-    bgColor: 'bg-teal-50',
-    borderColor: 'border-teal-200',
-    textColor: 'text-teal-700',
-    layers: layerTypes.filter(layer => ['Merge'].includes(layer.type))
-  }
-]
+import { useState, useEffect } from 'react'
 
 interface BlockPaletteProps {
   className?: string
 }
 
-export function BlockPalette({ 
+export default function BlockPalette({ 
   className = ''
-}: BlockPaletteProps) {
+}: BlockPaletteProps = {}) {
+  const [layerTypes, setLayerTypes] = useState<Array<{ type: string; icon: string; description: string }>>([])
   const [searchTerm, setSearchTerm] = useState('')
+
+  // Load layer types when component mounts and when layerDefs changes
+  useEffect(() => {
+    const updateLayerTypes = () => {
+      const types = getLayerTypes()
+      setLayerTypes(types)
+    }
+
+    // Initial load
+    updateLayerTypes()
+
+    // Set up an interval to check for updates (since layerDefs is populated asynchronously)
+    const interval = setInterval(() => {
+      const currentTypes = getLayerTypes()
+      if (currentTypes.length > 0 && currentTypes.length !== layerTypes.length) {
+        setLayerTypes(currentTypes)
+        clearInterval(interval) // Stop checking once we have layers
+      }
+    }, 100)
+
+    // Clean up interval on unmount
+    return () => clearInterval(interval)
+  }, [layerTypes.length])
+
+  // Group layers by category with color coding
+  const layerCategories = [
+    {
+      name: 'Input/Output',
+      color: 'emerald',
+      bgColor: 'bg-emerald-50',
+      borderColor: 'border-emerald-200',
+      textColor: 'text-emerald-700',
+      layers: layerTypes.filter(layer => ['Input', 'Output'].includes(layer.type))
+    },
+    {
+      name: 'Dense Layers',
+      color: 'blue',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-200',
+      textColor: 'text-blue-700',
+      layers: layerTypes.filter(layer => ['Dense'].includes(layer.type))
+    },
+    {
+      name: 'Convolutional',
+      color: 'purple',
+      bgColor: 'bg-purple-50',
+      borderColor: 'border-purple-200',
+      textColor: 'text-purple-700',
+      layers: layerTypes.filter(layer => ['Conv2D', 'Conv2DTranspose'].includes(layer.type))
+    },
+    {
+      name: 'Pooling',
+      color: 'indigo',
+      bgColor: 'bg-indigo-50',
+      borderColor: 'border-indigo-200',
+      textColor: 'text-indigo-700',
+      layers: layerTypes.filter(layer => ['MaxPool2D', 'GlobalAvgPool', 'UpSampling2D'].includes(layer.type))
+    },
+    {
+      name: 'Transformation',
+      color: 'amber',
+      bgColor: 'bg-amber-50',
+      borderColor: 'border-amber-200',
+      textColor: 'text-amber-700',
+      layers: layerTypes.filter(layer => ['Flatten'].includes(layer.type))
+    },
+    {
+      name: 'Activation',
+      color: 'orange',
+      bgColor: 'bg-orange-50',
+      borderColor: 'border-orange-200',
+      textColor: 'text-orange-700',
+      layers: layerTypes.filter(layer => ['Activation'].includes(layer.type))
+    },
+    {
+      name: 'Regularization',
+      color: 'rose',
+      bgColor: 'bg-rose-50',
+      borderColor: 'border-rose-200',
+      textColor: 'text-rose-700',
+      layers: layerTypes.filter(layer => ['BatchNorm', 'Dropout'].includes(layer.type))
+    },
+    {
+      name: 'Sequence',
+      color: 'cyan',
+      bgColor: 'bg-cyan-50',
+      borderColor: 'border-cyan-200',
+      textColor: 'text-cyan-700',
+      layers: layerTypes.filter(layer => ['Embedding', 'LSTM', 'GRU'].includes(layer.type))
+    },
+    {
+      name: 'Merge',
+      color: 'teal',
+      bgColor: 'bg-teal-50',
+      borderColor: 'border-teal-200',
+      textColor: 'text-teal-700',
+      layers: layerTypes.filter(layer => ['Merge'].includes(layer.type))
+    }
+  ]
   
   const handleDragStart = (event: React.DragEvent, layerType: string) => {
     event.dataTransfer.setData('layerType', layerType)
@@ -148,7 +170,7 @@ export function BlockPalette({
               {category.layers.map((layer) => (
                 <div
                   key={layer.type}
-                  className={`cursor-move hover:shadow-lg transition-all duration-300 hover:scale-[1.02] ${category.borderColor} ${category.bgColor} hover:shadow-slate-200 rounded-xl shadow-sm border-2 p-3`}
+                  className={`cursor-move hover:shadow-lg transition-all duration-300 hover:scale-[1.02] ${category.borderColor} ${category.bgColor} hover:shadow-shadow-slate-200 rounded-xl shadow-sm border-2 p-3`}
                   draggable
                   onDragStart={(event) => handleDragStart(event, layer.type)}
                   style={{ cursor: 'grab' }}

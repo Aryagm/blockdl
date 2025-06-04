@@ -1,6 +1,6 @@
 import { AppShell } from './components/AppShell'
 import { CanvasEditor } from './components/CanvasEditor'
-import { BlockPalette } from './components/BlockPalette'
+import BlockPalette from './components/BlockPalette'
 import { CodeViewer } from './components/CodeViewer'
 import type { Node, Edge } from '@xyflow/react'
 import { useFlowStore } from './lib/flow-store'
