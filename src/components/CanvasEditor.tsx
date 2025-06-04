@@ -1,165 +1,170 @@
-import { useCallback, useState, useEffect } from 'react'
-import { 
-  ReactFlow, 
-  ReactFlowProvider, 
-  Background, 
-  Controls, 
+/**
+ * Visual flow editor for neural network architectures
+ *
+ * Drag layers from palette, connect them visually, and generate code.
+ * Uses React Flow with Zustand for state management.
+ */
+
+import { useCallback, useState, useEffect } from "react";
+
+import {
+  ReactFlow,
+  ReactFlowProvider,
+  Background,
+  Controls,
   MiniMap,
   BackgroundVariant,
   ConnectionLineType,
-} from '@xyflow/react'
-import type { 
-  Edge,
+} from "@xyflow/react";
+import type {
   Node,
   NodeTypes,
   ReactFlowInstance,
-  XYPosition
-} from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
-import { LayerNode } from './LayerNode'
-import { getDefaultParams } from '../lib/layer-defs'
-import { useFlowStore } from '../lib/flow-store'
+  XYPosition,
+} from "@xyflow/react";
 
-// Custom node types can be defined here
-const nodeTypes: NodeTypes = {
-  layerNode: LayerNode,
-}
+import "@xyflow/react/dist/style.css";
 
+import { LayerNode } from "./LayerNode";
+import { getDefaultParams } from "../lib/layer-defs";
+import { useFlowStore } from "../lib/flow-store";
+import { cn } from "../lib/utils";
+
+// Flow editor configuration
+const FLOW_CONFIG = {
+  BACKGROUND: { GAP: 25, SIZE: 1, COLOR: "#f7f7f7" },
+  EDGE: { STROKE_WIDTH: 2, STROKE_COLOR: "#6b7280" },
+} as const;
+
+const nodeTypes: NodeTypes = { layerNode: LayerNode };
+
+/**
+ * Props for CanvasEditor component
+ */
 interface CanvasEditorProps {
-  className?: string
-  // For backwards compatibility, but we'll use Zustand instead
-  nodes?: Node[]
-  edges?: Edge[]
-  onNodesChange?: (nodes: Node[]) => void
-  onEdgesChange?: (edges: Edge[]) => void
+  className?: string;
 }
 
-function CanvasEditorInner({ 
-  className = '',
-  nodes: propNodes = [],
-  edges: propEdges = []
-}: CanvasEditorProps) {
-  const { 
-    nodes, 
-    edges, 
-    setNodes,
-    setEdges,
-    onNodesChange: onNodesChangeStore, 
-    onEdgesChange: onEdgesChangeStore, 
-    onConnect: onConnectStore,
-    addNode 
-  } = useFlowStore()
-  
-  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null)
+function CanvasEditorInner({ className = "" }: CanvasEditorProps) {
+  const {
+    nodes,
+    edges,
+    onNodesChange: handleNodesChange,
+    onEdgesChange: handleEdgesChange,
+    onConnect: handleConnect,
+    addNode,
+  } = useFlowStore();
 
-  // Initialize store with prop values on mount if store is empty
-  useEffect(() => {
-    if (nodes.length === 0 && propNodes.length > 0) {
-      setNodes(propNodes)
-    }
-    if (edges.length === 0 && propEdges.length > 0) {
-      setEdges(propEdges)
-    }
-  }, [nodes.length, edges.length, propNodes, propEdges, setNodes, setEdges])
+  const [reactFlowInstance, setReactFlowInstance] =
+    useState<ReactFlowInstance | null>(null);
 
-  // Prevent all delete key functionality
+  // Prevent accidental node deletion to preserve network integrity
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        // Check if the target is an input element where deletion should be allowed
-        const target = event.target as HTMLElement
-        if (target && (
-          target.tagName === 'INPUT' || 
-          target.tagName === 'TEXTAREA' ||
-          target.contentEditable === 'true'
-        )) {
-          return // Allow deletion in input fields
+      if (event.key === "Delete" || event.key === "Backspace") {
+        const target = event.target as HTMLElement;
+
+        // Allow deletion in input fields
+        if (
+          target &&
+          (target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
+            target.contentEditable === "true")
+        ) {
+          return;
         }
-        
-        // Prevent all other delete operations
-        event.preventDefault()
-        event.stopPropagation()
+
+        // Block delete operations to preserve network structure
+        event.preventDefault();
+        event.stopPropagation();
       }
-    }
+    };
 
-    // Add event listener with capture to intercept before ReactFlow
-    document.addEventListener('keydown', handleKeyDown, true)
-    return () => document.removeEventListener('keydown', handleKeyDown, true)
-  }, [])
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, []);
 
-  // Handle drag over event
-  const onDragOver = useCallback((event: React.DragEvent) => {
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
-  }, [])
+  const handleDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, []);
 
-  // Handle drop event with custom layer type strings
-  const onDrop = useCallback(
+  const handleDrop = useCallback(
     (event: React.DragEvent) => {
-      event.preventDefault()
+      event.preventDefault();
 
-      const reactFlowBounds = event.currentTarget.getBoundingClientRect()
-      const layerType = event.dataTransfer.getData('layerType')
+      if (!reactFlowInstance) return;
 
-      // Check if the dropped element is valid
-      if (typeof layerType === 'undefined' || !layerType || !reactFlowInstance) {
-        return
-      }
+      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
+      const layerType = event.dataTransfer.getData("layerType");
+
+      if (!layerType) return;
 
       const position: XYPosition = reactFlowInstance.screenToFlowPosition({
         x: event.clientX - reactFlowBounds.left,
         y: event.clientY - reactFlowBounds.top,
-      })
+      });
 
       const newNode: Node = {
         id: `${layerType.toLowerCase()}-${Date.now()}`,
-        type: 'layerNode',
+        type: "layerNode",
         position,
-        data: { 
+        data: {
           type: layerType,
-          params: getDefaultParams(layerType)
+          params: getDefaultParams(layerType),
         },
-      }
+      };
 
-      addNode(newNode)
+      addNode(newNode);
     },
     [reactFlowInstance, addNode]
-  )
+  );
 
   return (
-    <div className={`h-full w-full ${className}`}>
+    <div className={cn("h-full w-full", className)}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChangeStore}
-        onEdgesChange={onEdgesChangeStore}
-        onConnect={onConnectStore}
+        onNodesChange={handleNodesChange}
+        onEdgesChange={handleEdgesChange}
+        onConnect={handleConnect}
         onInit={setReactFlowInstance}
-        onDrop={onDrop}
-        onDragOver={onDragOver}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
         nodeTypes={nodeTypes}
         fitView
         attributionPosition="top-right"
         deleteKeyCode={[]}
-        multiSelectionKeyCode={['Control', 'Meta']}
+        multiSelectionKeyCode={["Control", "Meta"]}
         connectionLineType={ConnectionLineType.SmoothStep}
         defaultEdgeOptions={{
-          type: 'smoothstep',
-          style: { strokeWidth: 2, stroke: '#6b7280' }
+          type: "smoothstep",
+          style: {
+            strokeWidth: FLOW_CONFIG.EDGE.STROKE_WIDTH,
+            stroke: FLOW_CONFIG.EDGE.STROKE_COLOR,
+          },
         }}
       >
         <Controls />
         <MiniMap />
-        <Background variant={BackgroundVariant.Lines} gap={25} size={1} color="#f7f7f7" />
+        <Background
+          variant={BackgroundVariant.Lines}
+          gap={FLOW_CONFIG.BACKGROUND.GAP}
+          size={FLOW_CONFIG.BACKGROUND.SIZE}
+          color={FLOW_CONFIG.BACKGROUND.COLOR}
+        />
       </ReactFlow>
     </div>
-  )
+  );
 }
 
+/**
+ * Main CanvasEditor component with ReactFlow provider
+ */
 export function CanvasEditor(props: CanvasEditorProps) {
   return (
     <ReactFlowProvider>
       <CanvasEditorInner {...props} />
     </ReactFlowProvider>
-  )
+  );
 }

@@ -1,141 +1,90 @@
-import { Input } from './ui/input'
-import { Search, X } from 'lucide-react'
-import { getLayerTypes } from '../lib/layer-defs'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from "react"
+import { Search, X } from "lucide-react"
+import { Input } from "./ui/input"
+import { getLayerTypes, getLayerCategoriesFromYAML } from "../lib/layer-defs"
+
+const CONFIG = {
+  POLLING_INTERVAL: 100,
+  DRAG_CURSOR: { GRAB: "grab", GRABBING: "grabbing" }
+} as const
+
+type LayerType = {
+  type: string
+  icon: string
+  description: string
+}
+
+type CategoryType = {
+  name: string
+  color: string
+  bgColor: string
+  borderColor: string
+  textColor: string
+  description: string
+  layerTypes: string[]
+}
 
 interface BlockPaletteProps {
   className?: string
 }
 
-export default function BlockPalette({ 
-  className = ''
-}: BlockPaletteProps = {}) {
-  const [layerTypes, setLayerTypes] = useState<Array<{ type: string; icon: string; description: string }>>([])
-  const [searchTerm, setSearchTerm] = useState('')
+// Drag-and-drop interface for React Flow
+export default function BlockPalette({ className = "" }: BlockPaletteProps = {}) {
+  const [layerTypes, setLayerTypes] = useState<LayerType[]>([])
+  const [layerCategories, setLayerCategories] = useState<CategoryType[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
 
-  // Load layer types when component mounts and when layerDefs changes
+  const updateData = useCallback(() => {
+    const types = getLayerTypes()
+    const categories = getLayerCategoriesFromYAML()
+    
+    setLayerTypes(types)
+    setLayerCategories(categories)
+  }, [])
+
+  const handleDragStart = useCallback((event: React.DragEvent, layerType: string) => {
+    event.dataTransfer.setData("layerType", layerType)
+    event.dataTransfer.setData("application/reactflow", "default")
+    event.dataTransfer.effectAllowed = "move"
+  }, [])
+
+  const clearSearch = useCallback(() => setSearchTerm(""), [])
+
   useEffect(() => {
-    const updateLayerTypes = () => {
-      const types = getLayerTypes()
-      setLayerTypes(types)
-    }
+    updateData()
 
-    // Initial load
-    updateLayerTypes()
-
-    // Set up an interval to check for updates (since layerDefs is populated asynchronously)
+    // Poll until data loads (YAML loading is async)
     const interval = setInterval(() => {
       const currentTypes = getLayerTypes()
+      
       if (currentTypes.length > 0 && currentTypes.length !== layerTypes.length) {
-        setLayerTypes(currentTypes)
-        clearInterval(interval) // Stop checking once we have layers
+        updateData()
+        clearInterval(interval)
       }
-    }, 100)
+    }, CONFIG.POLLING_INTERVAL)
 
-    // Clean up interval on unmount
     return () => clearInterval(interval)
-  }, [layerTypes.length])
+  }, [layerTypes.length, updateData])
 
-  // Group layers by category with color coding
-  const layerCategories = [
-    {
-      name: 'Input/Output',
-      color: 'emerald',
-      bgColor: 'bg-emerald-50',
-      borderColor: 'border-emerald-200',
-      textColor: 'text-emerald-700',
-      layers: layerTypes.filter(layer => ['Input', 'Output'].includes(layer.type))
-    },
-    {
-      name: 'Dense Layers',
-      color: 'blue',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-200',
-      textColor: 'text-blue-700',
-      layers: layerTypes.filter(layer => ['Dense'].includes(layer.type))
-    },
-    {
-      name: 'Convolutional',
-      color: 'purple',
-      bgColor: 'bg-purple-50',
-      borderColor: 'border-purple-200',
-      textColor: 'text-purple-700',
-      layers: layerTypes.filter(layer => ['Conv2D', 'Conv2DTranspose'].includes(layer.type))
-    },
-    {
-      name: 'Pooling',
-      color: 'indigo',
-      bgColor: 'bg-indigo-50',
-      borderColor: 'border-indigo-200',
-      textColor: 'text-indigo-700',
-      layers: layerTypes.filter(layer => ['MaxPool2D', 'GlobalAvgPool', 'UpSampling2D'].includes(layer.type))
-    },
-    {
-      name: 'Transformation',
-      color: 'amber',
-      bgColor: 'bg-amber-50',
-      borderColor: 'border-amber-200',
-      textColor: 'text-amber-700',
-      layers: layerTypes.filter(layer => ['Flatten'].includes(layer.type))
-    },
-    {
-      name: 'Activation',
-      color: 'orange',
-      bgColor: 'bg-orange-50',
-      borderColor: 'border-orange-200',
-      textColor: 'text-orange-700',
-      layers: layerTypes.filter(layer => ['Activation'].includes(layer.type))
-    },
-    {
-      name: 'Regularization',
-      color: 'rose',
-      bgColor: 'bg-rose-50',
-      borderColor: 'border-rose-200',
-      textColor: 'text-rose-700',
-      layers: layerTypes.filter(layer => ['BatchNorm', 'Dropout'].includes(layer.type))
-    },
-    {
-      name: 'Sequence',
-      color: 'cyan',
-      bgColor: 'bg-cyan-50',
-      borderColor: 'border-cyan-200',
-      textColor: 'text-cyan-700',
-      layers: layerTypes.filter(layer => ['Embedding', 'LSTM', 'GRU'].includes(layer.type))
-    },
-    {
-      name: 'Merge',
-      color: 'teal',
-      bgColor: 'bg-teal-50',
-      borderColor: 'border-teal-200',
-      textColor: 'text-teal-700',
-      layers: layerTypes.filter(layer => ['Merge'].includes(layer.type))
-    }
-  ]
-  
-  const handleDragStart = (event: React.DragEvent, layerType: string) => {
-    event.dataTransfer.setData('layerType', layerType)
-    event.dataTransfer.setData('application/reactflow', 'default')
-    event.dataTransfer.effectAllowed = 'move'
-  }
+  const filteredCategories = layerCategories
+    .map((category) => {
+      const matchingLayers = layerTypes.filter(
+        (layer) =>
+          category.layerTypes.includes(layer.type) &&
+          (layer.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            layer.description.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
 
-  // Filter layers based on search term
-  const filteredCategories = layerCategories.map(category => ({
-    ...category,
-    layers: category.layers.filter(layer =>
-      layer.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      layer.description.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  })).filter(category => category.layers.length > 0)
+      return { ...category, layers: matchingLayers }
+    })
+    .filter((category) => category.layers.length > 0)
 
-  const clearSearch = () => setSearchTerm('')
+  const hasNoResults = filteredCategories.length === 0 && searchTerm
 
   return (
     <div className={`space-y-6 p-6 h-full overflow-y-auto bg-slate-50/80 ${className}`}>
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-slate-800 text-lg">Block Palette</h2>
-      </div>
+      <h2 className="font-semibold text-slate-800 text-lg">Block Palette</h2>
       
-      {/* Search Input */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
         <Input
@@ -154,8 +103,8 @@ export default function BlockPalette({
           </button>
         )}
       </div>
-      
-      {filteredCategories.length === 0 && searchTerm ? (
+
+      {hasNoResults ? (
         <div className="text-center py-8 text-slate-500">
           <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
           <p>No blocks found matching "{searchTerm}"</p>
@@ -170,12 +119,12 @@ export default function BlockPalette({
               {category.layers.map((layer) => (
                 <div
                   key={layer.type}
-                  className={`cursor-move hover:shadow-lg transition-all duration-300 hover:scale-[1.02] ${category.borderColor} ${category.bgColor} hover:shadow-shadow-slate-200 rounded-xl shadow-sm border-2 p-3`}
+                  className={`cursor-move hover:shadow-lg transition-all duration-300 hover:scale-[1.02] ${category.borderColor} ${category.bgColor} rounded-xl shadow-sm border-2 p-3`}
                   draggable
                   onDragStart={(event) => handleDragStart(event, layer.type)}
-                  style={{ cursor: 'grab' }}
-                  onMouseDown={(e) => e.currentTarget.style.cursor = 'grabbing'}
-                  onMouseUp={(e) => e.currentTarget.style.cursor = 'grab'}
+                  style={{ cursor: CONFIG.DRAG_CURSOR.GRAB }}
+                  onMouseDown={(e) => (e.currentTarget.style.cursor = CONFIG.DRAG_CURSOR.GRABBING)}
+                  onMouseUp={(e) => (e.currentTarget.style.cursor = CONFIG.DRAG_CURSOR.GRAB)}
                 >
                   <div className={`flex items-center gap-2 mb-1 ${category.textColor}`}>
                     <span className="text-base">{layer.icon}</span>
@@ -190,7 +139,6 @@ export default function BlockPalette({
           </div>
         ))
       )}
-      
     </div>
   )
 }

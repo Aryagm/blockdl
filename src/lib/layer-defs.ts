@@ -3,6 +3,8 @@
  * Layer definitions are loaded from YAML configuration at startup
  */
 
+import { loadCategoriesWithLayers, getCachedYamlContent } from './yaml-layer-loader'
+
 // Type for parameter values - matching the YAML loader
 export type LayerParamValue = string | number | boolean
 
@@ -93,4 +95,22 @@ export function getUsedKerasImports(layerTypes: string[]): string[] {
   })
   
   return Array.from(imports)
+}
+
+/**
+ * Get layer categories with their associated layers from YAML
+ */
+export function getLayerCategoriesFromYAML() {
+  const yamlContent = getCachedYamlContent()
+  if (!yamlContent) {
+    console.warn('YAML content not loaded yet, returning empty categories')
+    return []
+  }
+  
+  try {
+    return loadCategoriesWithLayers(yamlContent)
+  } catch (error) {
+    console.error('Error getting categories from YAML:', error)
+    return []
+  }
 }

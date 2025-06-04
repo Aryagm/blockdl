@@ -301,6 +301,9 @@ export async function loadLayersFromYAML(yamlContent: string): Promise<Record<st
   }
 }
 
+// Store the YAML content for later use
+let cachedYamlContent: string | null = null
+
 /**
  * Load layer categories from YAML
  */
@@ -315,6 +318,54 @@ export function loadCategoriesFromYAML(yamlContent: string) {
 }
 
 /**
+ * Load categories with their associated layers
+ */
+export function loadCategoriesWithLayers(yamlContent: string) {
+  try {
+    const config = yaml.load(yamlContent) as YAMLLayerConfig
+    const categories = config.categories
+    const layers = config.layers
+    
+    // Create a mapping of category key to layer names
+    const categoryLayerMap: Record<string, string[]> = {}
+    
+    // Initialize each category with empty array
+    Object.keys(categories).forEach(categoryKey => {
+      categoryLayerMap[categoryKey] = []
+    })
+    
+    // Map layers to their categories
+    Object.entries(layers).forEach(([layerName, layerDef]) => {
+      const categoryKey = layerDef.metadata.category
+      if (categoryLayerMap[categoryKey]) {
+        categoryLayerMap[categoryKey].push(layerName)
+      }
+    })
+    
+    // Transform to the format expected by BlockPalette
+    return Object.entries(categories).map(([categoryKey, categoryDef]) => ({
+      name: categoryDef.name,
+      color: categoryDef.color,
+      bgColor: categoryDef.bg_color,
+      borderColor: categoryDef.border_color,
+      textColor: categoryDef.text_color,
+      description: categoryDef.description,
+      layerTypes: categoryLayerMap[categoryKey] || []
+    }))
+  } catch (error) {
+    console.error('Error loading categories with layers from YAML:', error)
+    throw error
+  }
+}
+
+/**
+ * Get the cached YAML content
+ */
+export function getCachedYamlContent(): string | null {
+  return cachedYamlContent
+}
+
+/**
  * Initialize layer definitions by loading from YAML file and populating layerDefs
  */
 export async function initializeLayerDefs(): Promise<void> {
@@ -326,6 +377,7 @@ export async function initializeLayerDefs(): Promise<void> {
     }
     
     const yamlContent = await response.text()
+    cachedYamlContent = yamlContent // Cache the content
     const loadedLayerDefs = await loadLayersFromYAML(yamlContent)
     
     // Clear existing definitions and add loaded ones

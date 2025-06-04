@@ -1,90 +1,257 @@
-import { useEffect, useState } from 'react'
-import CodeMirror from '@uiw/react-codemirror'
-import { python } from '@codemirror/lang-python'
-import { Button } from './ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Copy, Check, Download } from 'lucide-react'
-import { parseGraphToDAG, generateKerasCode, generateFunctionalKerasCode } from '../lib/graph-utils'
-import { useFlowStore } from '../lib/flow-store'
+import { useCallback, useEffect, useState } from "react";
+import CodeMirror from "@uiw/react-codemirror";
+import { python } from "@codemirror/lang-python";
+import { Check, Copy, Download } from "lucide-react";
 
-interface CodeViewerProps {
-  className?: string
-}
+import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import {
+  parseGraphToDAG,
+  generateKerasCode,
+  generateFunctionalKerasCode,
+  type DAGResult,
+} from "../lib/graph-utils";
+import { useFlowStore } from "../lib/flow-store";
+import { cn } from "../lib/utils";
 
-export function CodeViewer({ className = '' }: CodeViewerProps) {
-  const { nodes, edges } = useFlowStore()
-  const [generatedCode, setGeneratedCode] = useState<string>('')
-  const [isCopied, setIsCopied] = useState(false)
-  const [codeType, setCodeType] = useState<'sequential' | 'functional'>('sequential')
+const UI_CONFIG = {
+  COPY_TIMEOUT: 2000,
+  BUTTON_HEIGHT: "h-9",
+  BORDER_RADIUS: "rounded-lg",
+  SPACING: {
+    CARD: "px-4 sm:px-6",
+    PADDING: "p-4 sm:p-6",
+  },
+} as const;
 
-  // Re-generate code when nodes or edges change
-  useEffect(() => {
-    const dagResult = parseGraphToDAG(nodes, edges)
-    
-    if (!dagResult.isValid) {
-      setGeneratedCode(`# Error: Invalid network structure\n# ${dagResult.errors.join('\n# ')}`)
-      return
-    }
-    
-    // Determine if we need Functional API (multiple inputs/outputs or complex structure)
-    const hasMultipleInputs = dagResult.orderedNodes.filter(n => n.type === 'Input').length > 1
-    const hasMultipleOutputs = dagResult.orderedNodes.filter(n => n.type === 'Output').length > 1
-    const hasComplexStructure = Array.from(dagResult.edgeMap.values()).some(targets => targets.length > 1)
-    const hasMergeLayer = dagResult.orderedNodes.some(n => n.type === 'Merge')
-    
-    const shouldUseFunctional = hasMultipleInputs || hasMultipleOutputs || hasComplexStructure || hasMergeLayer
-    
-    if (shouldUseFunctional) {
-      setCodeType('functional')
-      const code = generateFunctionalKerasCode(dagResult)
-      setGeneratedCode(code)
-    } else {
-      setCodeType('sequential')
-      const code = generateKerasCode(dagResult.orderedNodes)
-      setGeneratedCode(code)
-    }
-  }, [nodes, edges])
-
-  const handleCopyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(generatedCode)
-      setIsCopied(true)
-      // Reset the confirmation after 2 seconds
-      setTimeout(() => setIsCopied(false), 2000)
-      console.log('Code copied to clipboard!')
-    } catch (err) {
-      console.error('Failed to copy code:', err)
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea')
-      textArea.value = generatedCode
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-      setIsCopied(true)
-      setTimeout(() => setIsCopied(false), 2000)
-    }
-  }
-
-  const handleDownloadCode = () => {
-    if (!generatedCode.trim()) return
-    
-    const blob = new Blob([generatedCode], { type: 'text/python' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `keras_model_${codeType}.py`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
+// Helper functions
+function checkIfFunctionalAPINeeded(dagResult: DAGResult): boolean {
+  const hasMultipleInputs =
+    dagResult.orderedNodes.filter((n) => n.type === "Input").length > 1;
+  const hasMultipleOutputs =
+    dagResult.orderedNodes.filter((n) => n.type === "Output").length > 1;
+  const hasComplexStructure = Array.from(dagResult.edgeMap.values()).some(
+    (targets) => targets.length > 1
+  );
+  const hasMergeLayer = dagResult.orderedNodes.some((n) => n.type === "Merge");
 
   return (
-    <div className={`h-full flex flex-col bg-slate-50/80 ${className}`}>
-      <div className="flex-1 flex flex-col p-4 sm:p-6 min-h-0">
+    hasMultipleInputs ||
+    hasMultipleOutputs ||
+    hasComplexStructure ||
+    hasMergeLayer
+  );
+}
+
+function fallbackCopyToClipboard(text: string): void {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  document.body.appendChild(textArea);
+  textArea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textArea);
+}
+
+// Sub-components
+interface APIBadgeProps {
+  codeType: "sequential" | "functional";
+}
+
+function APIBadge({ codeType }: APIBadgeProps) {
+  const isFunctional = codeType === "functional";
+
+  return (
+    <span
+      className={cn(
+        "text-xs px-3 py-1.5 rounded-full font-medium border",
+        isFunctional
+          ? "bg-blue-100 text-blue-700 border-blue-200"
+          : "bg-green-100 text-green-700 border-green-200"
+      )}
+    >
+      {isFunctional ? "Functional API" : "Sequential API"}
+    </span>
+  );
+}
+
+interface ActionButtonsProps {
+  onDownload: () => void;
+  onCopy: () => void;
+  isDisabled: boolean;
+  isCopied: boolean;
+}
+
+function ActionButtons({
+  onDownload,
+  onCopy,
+  isDisabled,
+  isCopied,
+}: ActionButtonsProps) {
+  const baseButtonClass = cn(
+    UI_CONFIG.BUTTON_HEIGHT,
+    "px-4",
+    UI_CONFIG.BORDER_RADIUS,
+    "transition-all duration-200 shadow-sm"
+  );
+
+  return (
+    <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onDownload}
+          disabled={isDisabled}
+          className={cn(
+            baseButtonClass,
+            "border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:shadow-md"
+          )}
+        >
+          <Download className="h-4 w-4 mr-2" />
+          Download .py
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onCopy}
+          disabled={isDisabled}
+          className={cn(
+            baseButtonClass,
+            isCopied
+              ? "border-green-300 bg-green-50 text-green-700 hover:bg-green-100 shadow-md"
+              : "border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:shadow-md"
+          )}
+        >
+          {isCopied ? (
+            <>
+              <Check className="h-4 w-4 mr-2" />
+              Copied!
+            </>
+          ) : (
+            <>
+              <Copy className="h-4 w-4 mr-2" />
+              Copy Code
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+interface CodeEditorProps {
+  code: string;
+}
+
+function CodeEditor({ code }: CodeEditorProps) {
+  return (
+    <div className="rounded-xl border border-slate-200 shadow-inner bg-slate-50/30 flex-1 min-h-0">
+      <div className="w-full h-full overflow-auto">
+        <CodeMirror
+          value={code}
+          height="100%"
+          extensions={[python()]}
+          editable={false}
+          basicSetup={{
+            lineNumbers: true,
+            foldGutter: true,
+            dropCursor: false,
+            allowMultipleSelections: false,
+            indentOnInput: false,
+            bracketMatching: true,
+            closeBrackets: false,
+            autocompletion: false,
+            highlightSelectionMatches: false,
+            searchKeymap: false,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+interface CodeViewerProps {
+  className?: string;
+}
+
+// Generates Keras code from visual neural network graph
+export function CodeViewer({ className = "" }: CodeViewerProps) {
+  const { nodes, edges } = useFlowStore();
+  const [generatedCode, setGeneratedCode] = useState("");
+  const [isCopied, setIsCopied] = useState(false);
+  const [codeType, setCodeType] = useState<"sequential" | "functional">(
+    "sequential"
+  );
+
+  const resetCopyState = useCallback(() => {
+    setTimeout(() => setIsCopied(false), UI_CONFIG.COPY_TIMEOUT);
+  }, []);
+
+  // Auto-generate code when graph changes
+  useEffect(() => {
+    const dagResult = parseGraphToDAG(nodes, edges);
+
+    if (!dagResult.isValid) {
+      setGeneratedCode(
+        `# Error: Invalid network structure\n# ${dagResult.errors.join("\n# ")}`
+      );
+      return;
+    }
+
+    const shouldUseFunctional = checkIfFunctionalAPINeeded(dagResult);
+
+    if (shouldUseFunctional) {
+      setCodeType("functional");
+      setGeneratedCode(generateFunctionalKerasCode(dagResult));
+    } else {
+      setCodeType("sequential");
+      setGeneratedCode(generateKerasCode(dagResult.orderedNodes));
+    }
+  }, [nodes, edges]);
+
+  const handleCopyCode = useCallback(async () => {
+    if (!generatedCode.trim()) return;
+
+    try {
+      await navigator.clipboard.writeText(generatedCode);
+      setIsCopied(true);
+      resetCopyState();
+    } catch {
+      // Fallback for older browsers
+      fallbackCopyToClipboard(generatedCode);
+      setIsCopied(true);
+      resetCopyState();
+    }
+  }, [generatedCode, resetCopyState]);
+
+  const handleDownloadCode = useCallback(() => {
+    if (!generatedCode.trim()) return;
+
+    const blob = new Blob([generatedCode], { type: "text/python" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `keras_model_${codeType}.py`;
+    document.body.appendChild(link);
+    link.click();
+
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [generatedCode, codeType]);
+
+  return (
+    <div className={cn("h-full flex flex-col bg-slate-50/80", className)}>
+      <div
+        className={cn(
+          "flex-1 flex flex-col min-h-0",
+          UI_CONFIG.SPACING.PADDING
+        )}
+      >
         <Card className="border-slate-200 bg-white shadow-sm rounded-xl flex-1 flex flex-col min-h-0">
-          <CardHeader className="pb-3 px-4 sm:px-6 flex-shrink-0">
+          <CardHeader
+            className={cn("pb-3 flex-shrink-0", UI_CONFIG.SPACING.CARD)}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -93,79 +260,26 @@ export function CodeViewer({ className = '' }: CodeViewerProps) {
                     Keras Code
                   </CardTitle>
                 </div>
-                <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${
-                  codeType === 'functional' 
-                    ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                    : 'bg-green-100 text-green-700 border border-green-200'
-                }`}>
-                  {codeType === 'functional' ? 'Functional API' : 'Sequential API'}
-                </span>
+                <APIBadge codeType={codeType} />
               </div>
             </div>
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadCode}
-                  disabled={!generatedCode.trim()}
-                  className="h-9 px-4 rounded-lg transition-all duration-200 shadow-sm border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:shadow-md"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download .py
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyCode}
-                  disabled={!generatedCode.trim()}
-                  className={`h-9 px-4 rounded-lg transition-all duration-200 shadow-sm ${
-                    isCopied 
-                      ? 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100 shadow-md' 
-                      : 'border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:shadow-md'
-                  }`}
-                >
-                  {isCopied ? (
-                    <>
-                      <Check className="h-4 w-4 mr-2" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy Code
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
+            <ActionButtons
+              onDownload={handleDownloadCode}
+              onCopy={handleCopyCode}
+              isDisabled={!generatedCode.trim()}
+              isCopied={isCopied}
+            />
           </CardHeader>
-          <CardContent className="pt-0 px-4 sm:px-6 pb-3 flex-1 flex flex-col min-h-0">
-            <div className="rounded-xl border border-slate-200 shadow-inner bg-slate-50/30 flex-1 min-h-0">
-              <div className="w-full h-full overflow-auto">
-                <CodeMirror
-                  value={generatedCode}
-                  height="100%"
-                  extensions={[python()]}
-                  editable={false}
-                  basicSetup={{
-                    lineNumbers: true,
-                    foldGutter: true,
-                    dropCursor: false,
-                    allowMultipleSelections: false,
-                    indentOnInput: false,
-                    bracketMatching: true,
-                    closeBrackets: false,
-                    autocompletion: false,
-                    highlightSelectionMatches: false,
-                    searchKeymap: false,
-                  }}
-                />
-              </div>
-            </div>
+          <CardContent
+            className={cn(
+              "pt-0 pb-3 flex-1 flex flex-col min-h-0",
+              UI_CONFIG.SPACING.CARD
+            )}
+          >
+            <CodeEditor code={generatedCode} />
           </CardContent>
         </Card>
       </div>
     </div>
-  )
+  );
 }

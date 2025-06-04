@@ -427,7 +427,8 @@ layers:
 
     keras:
       import: "Conv2DTranspose"
-      code_template: "Conv2DTranspose({{filters}}, kernel_size={{kernel_size}}, strides={{strides}}, padding='{{padding}}')"
+      code_template: |
+        Conv2DTranspose({{filters}}, kernel_size={{kernel_size}}, strides={{strides}}, padding='{{padding}}')
       shape_computation: "conv2d_transpose_layer"
 
   MaxPool2D:
