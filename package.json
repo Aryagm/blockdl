@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@codemirror/lang-python": "^6.2.1",
+    "@hookform/resolvers": "^5.0.1",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-popover": "^1.1.14",
@@ -29,9 +30,11 @@
     "ml-matrix": "^6.12.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-hook-form": "^7.57.0",
     "tailwind-merge": "^3.3.0",
     "tailwindcss": "^4.1.8",
     "use-undo": "^1.1.1",
+    "zod": "^3.25.51",
     "zundo": "^2.3.0",
     "zustand": "^5.0.5"
   },
