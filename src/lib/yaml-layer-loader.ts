@@ -1,95 +1,97 @@
 /**
  * YAML Layer Configuration Loader
- * Loads layer definitions from YAML configuration files
+ * Loads layer definitions from YAML configuration files using Zod validation
  */
 
 import yaml from 'js-yaml'
+import { z } from 'zod'
 import type { LayerDef, LayerFormField, LayerParamValue } from './layer-defs'
 import { layerDefs } from './layer-defs'
 
-// Define a type for parameter values - use the shared type
-type ParamValue = LayerParamValue
+// Zod schemas for YAML structure validation
+const YAMLParameterSchema = z.object({
+  type: z.enum(['number', 'text', 'select']),
+  label: z.string(),
+  default: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  options: z.array(z.object({
+    value: z.string(),
+    label: z.string()
+  })).optional(),
+  validation: z.object({
+    min: z.number().optional(),
+    max: z.number().optional(),
+    step: z.number().optional(),
+    required: z.boolean().optional()
+  }).optional(),
+  show_when: z.record(z.array(z.string())).optional(),
+  help: z.string().optional()
+})
 
-// YAML configuration interfaces
-interface YAMLLayerConfig {
-  metadata: {
-    version: string
-    description: string
-    framework: string
-    created: string
-  }
-  categories: Record<string, {
-    name: string
-    color: string
-    bg_color: string
-    border_color: string
-    text_color: string
-    description: string
-  }>
-  layers: Record<string, YAMLLayer>
-}
+const YAMLLayerSchema = z.object({
+  metadata: z.object({
+    category: z.string(),
+    icon: z.string(),
+    description: z.string(),
+    tags: z.array(z.string()),
+    documentation: z.string().optional()
+  }),
+  visual: z.object({
+    handles: z.object({
+      input: z.boolean(),
+      output: z.boolean()
+    }),
+    default_size: z.tuple([z.number(), z.number()]).optional()
+  }),
+  parameters: z.record(YAMLParameterSchema),
+  features: z.object({
+    supports_multiplier: z.boolean().optional()
+  }).optional(),
+  keras: z.object({
+    import: z.string(),
+    code_template: z.string(),
+    shape_computation: z.string()
+  })
+})
 
-interface YAMLLayer {
-  metadata: {
-    category: string
-    icon: string
-    description: string
-    tags: string[]
-    documentation?: string
-  }
-  visual: {
-    handles: {
-      input: boolean
-      output: boolean
-    }
-    default_size?: [number, number]
-  }
-  parameters: Record<string, YAMLParameter>
-  features?: {
-    supports_multiplier?: boolean
-  }
-  keras: {
-    import: string
-    code_template: string
-    shape_computation: string
-  }
-}
+const YAMLLayerConfigSchema = z.object({
+  metadata: z.object({
+    version: z.string(),
+    description: z.string(),
+    framework: z.string(),
+    created: z.string()
+  }),
+  categories: z.record(z.object({
+    name: z.string(),
+    color: z.string(),
+    bg_color: z.string(),
+    border_color: z.string(),
+    text_color: z.string(),
+    description: z.string()
+  })),
+  layers: z.record(YAMLLayerSchema)
+})
 
-interface YAMLParameter {
-  type: 'number' | 'text' | 'select'
-  label: string
-  default?: ParamValue
-  options?: Array<{ value: string; label: string }>
-  validation?: {
-    min?: number
-    max?: number
-    step?: number
-    required?: boolean
-  }
-  show_when?: Record<string, string[]>
-  help?: string
-}
+type YAMLLayer = z.infer<typeof YAMLLayerSchema>
+type YAMLParameter = z.infer<typeof YAMLParameterSchema>
 
 /**
  * Convert YAML parameter to LayerFormField format
  */
 function convertParameter(key: string, param: YAMLParameter): LayerFormField {
-  const { label, type, options, validation, show_when } = param
-  
   const field: LayerFormField = {
     key,
-    label,
-    type,
-    ...(options && { options }),
-    ...(validation?.min !== undefined && { min: validation.min }),
-    ...(validation?.max !== undefined && { max: validation.max }),
-    ...(validation?.step !== undefined && { step: validation.step })
+    label: param.label,
+    type: param.type,
+    ...(param.options && { options: param.options }),
+    ...(param.validation?.min !== undefined && { min: param.validation.min }),
+    ...(param.validation?.max !== undefined && { max: param.validation.max }),
+    ...(param.validation?.step !== undefined && { step: param.validation.step })
   }
 
   // Convert show_when conditions to show function
-  if (show_when) {
-    field.show = (params: Record<string, ParamValue>) => {
-      return Object.entries(show_when).some(([paramKey, values]) => {
+  if (param.show_when) {
+    field.show = (params: Record<string, LayerParamValue>) => {
+      return Object.entries(param.show_when!).some(([paramKey, values]) => {
         return values.includes(String(params[paramKey]))
       })
     }
@@ -99,189 +101,128 @@ function convertParameter(key: string, param: YAMLParameter): LayerFormField {
 }
 
 /**
- * Handle computed values based on shape computation type
+ * Shape computation utilities
  */
-function handleComputedValue(varName: string, params: Record<string, ParamValue>): string {
-  switch (varName) {
-    case 'computed_shape':
-      return computeInputShape(params)
-    case 'computed_units':
-      return computeOutputUnits(params).toString()
-    case 'computed_activation':
-      return computeOutputActivation(params)
-    default:
-      return `{{${varName}}}`
-  }
-}
-
-/**
- * Handle multiplier logic for code generation
- */
-function handleMultiplier(code: string, params: Record<string, ParamValue>, layerName: string): string {
-  const multiplier = Number(params.multiplier) || 1
-  if (multiplier <= 1) {
-    return code.trim()
-  }
-
-  const baseCode = code.trim()
-  
-  if (multiplier <= 5) {
-    // For small multipliers, generate individual layers
-    return Array(multiplier).fill(baseCode).join(',\n    ')
-  } else {
-    // For large multipliers, use Python list comprehension
-    return `# Add ${multiplier} ${layerName} layers\n    *[${baseCode} for _ in range(${multiplier})]`
-  }
-}
-
-/**
- * Generate code from YAML template
- */
-function generateCodeFromTemplate(
-  template: string, 
-  params: Record<string, ParamValue>,
-  layerName: string
-): string {
-  let code = template
-  
-  // Handle Jinja2-like conditional statements for Merge layer
-  if (layerName === 'Merge') {
-    const mode = params.mode || 'concat'
+const ShapeComputers = {
+  computeInputShape(params: Record<string, LayerParamValue>): string {
+    const inputType = params.inputType || 'image_grayscale'
     
-    // Process conditional blocks
-    code = code.replace(
+    const computations: Record<string, () => string> = {
+      image_grayscale: () => `(${Number(params.height) || 28}, ${Number(params.width) || 28}, 1)`,
+      image_color: () => `(${Number(params.height) || 28}, ${Number(params.width) || 28}, 3)`,
+      image_custom: () => `(${Number(params.height) || 28}, ${Number(params.width) || 28}, ${Number(params.channels) || 1})`,
+      flat_data: () => `(${Number(params.flatSize) || 784},)`,
+      sequence: () => `(${Number(params.seqLength) || 100}, ${Number(params.features) || 128})`,
+      custom: () => String(params.customShape) || '(784,)'
+    }
+    
+    return computations[String(inputType)]?.() || '(784,)'
+  },
+
+  computeOutputUnits(params: Record<string, LayerParamValue>): number {
+    const outputType = params.outputType || 'multiclass'
+    
+    const computations: Record<string, () => number> = {
+      multiclass: () => Number(params.numClasses) || 10,
+      binary: () => 1,
+      regression: () => Number(params.units) || 1,
+      multilabel: () => Number(params.units) || 10,
+      custom: () => Number(params.units) || 10
+    }
+    
+    return computations[String(outputType)]?.() || 10
+  },
+
+  computeOutputActivation(params: Record<string, LayerParamValue>): string {
+    const outputType = params.outputType || 'multiclass'
+    
+    const activations: Record<string, string> = {
+      multiclass: 'softmax',
+      binary: 'sigmoid',
+      regression: 'linear',
+      multilabel: 'sigmoid',
+      custom: String(params.activation) || 'softmax'
+    }
+    
+    return activations[String(outputType)] || 'softmax'
+  }
+}
+
+/**
+ * Template processing utilities
+ */
+const TemplateProcessor = {
+  handleComputedValue(varName: string, params: Record<string, LayerParamValue>): string {
+    const computations: Record<string, () => string> = {
+      computed_shape: () => ShapeComputers.computeInputShape(params),
+      computed_units: () => ShapeComputers.computeOutputUnits(params).toString(),
+      computed_activation: () => ShapeComputers.computeOutputActivation(params)
+    }
+    
+    return computations[varName]?.() || `{{${varName}}}`
+  },
+
+  handleMultiplier(code: string, params: Record<string, LayerParamValue>, layerName: string): string {
+    const multiplier = Number(params.multiplier) || 1
+    if (multiplier <= 1) return code.trim()
+
+    const baseCode = code.trim()
+    
+    return multiplier <= 5 
+      ? Array(multiplier).fill(baseCode).join(',\n    ')
+      : `# Add ${multiplier} ${layerName} layers\n    *[${baseCode} for _ in range(${multiplier})]`
+  },
+
+  processConditionals(code: string, params: Record<string, LayerParamValue>): string {
+    // Handle Jinja2-like conditional statements for Merge layer
+    return code.replace(
       /\{%\s*if\s+mode\s*==\s*["'](\w+)["']\s*%\}([^{]+)\{%\s*endif\s*%\}/g,
-      (match, conditionMode, content) => {
+      (_, conditionMode, content) => {
+        const mode = params.mode || 'concat'
         return mode === conditionMode ? content.trim() : ''
       }
-    )
-    
-    // Remove any remaining empty lines
-    code = code.split('\n').filter(line => line.trim() !== '').join('\n').trim()
-  }
-  
-  // Handle template variables with computed values
-  code = code.replace(/{{\s*(\w+)\s*}}/g, (_match, varName) => {
-    // Handle computed values
-    if (varName.startsWith('computed_')) {
-      return handleComputedValue(varName, params)
-    }
-    
-    // Handle activation suffix
-    if (varName === 'activation_suffix') {
-      const activation = params.activation
-      return activation && activation !== 'none' ? `, activation='${activation}'` : ''
-    }
-    
-    // Handle regular parameter values
-    const value = params[varName]
-    return value !== undefined ? value.toString() : `{{${varName}}}`
-  })
+    ).split('\n').filter(line => line.trim() !== '').join('\n').trim()
+  },
 
-  // Handle multiplier logic
-  return handleMultiplier(code, params, layerName)
-}
+  processVariables(code: string, params: Record<string, LayerParamValue>): string {
+    return code.replace(/{{\s*(\w+)\s*}}/g, (_, varName) => {
+      if (varName.startsWith('computed_')) {
+        return this.handleComputedValue(varName, params)
+      }
+      
+      if (varName === 'activation_suffix') {
+        const activation = params.activation
+        return activation && activation !== 'none' ? `, activation='${activation}'` : ''
+      }
+      
+      const value = params[varName]
+      return value !== undefined ? value.toString() : `{{${varName}}}`
+    })
+  },
 
-/**
- * Compute input shape for Input layers
- */
-function computeInputShape(params: Record<string, ParamValue>): string {
-  const inputType = params.inputType || 'image_grayscale'
-  
-  switch (inputType) {
-    case 'image_grayscale': {
-      const h1 = Number(params.height) || 28
-      const w1 = Number(params.width) || 28
-      return `(${h1}, ${w1}, 1)`
-    }
-    case 'image_color': {
-      const h2 = Number(params.height) || 28
-      const w2 = Number(params.width) || 28
-      return `(${h2}, ${w2}, 3)`
-    }
-    case 'image_custom': {
-      const h3 = Number(params.height) || 28
-      const w3 = Number(params.width) || 28
-      const c3 = Number(params.channels) || 1
-      return `(${h3}, ${w3}, ${c3})`
-    }
-    case 'flat_data': {
-      const size = Number(params.flatSize) || 784
-      return `(${size},)`
-    }
-    case 'sequence': {
-      const seqLen = Number(params.seqLength) || 100
-      const features = Number(params.features) || 128
-      return `(${seqLen}, ${features})`
-    }
-    case 'custom': {
-      return String(params.customShape) || '(784,)'
-    }
-    default:
-      return '(784,)'
+  generateCode(template: string, params: Record<string, LayerParamValue>, layerName: string): string {
+    let code = this.processConditionals(template, params)
+    code = this.processVariables(code, params)
+    return this.handleMultiplier(code, params, layerName)
   }
 }
 
 /**
- * Compute output units for Output layers
- */
-function computeOutputUnits(params: Record<string, ParamValue>): number {
-  const outputType = params.outputType || 'multiclass'
-  
-  switch (outputType) {
-    case 'multiclass':
-      return Number(params.numClasses) || 10
-    case 'binary':
-      return 1
-    case 'regression':
-      return Number(params.units) || 1
-    case 'multilabel':
-      return Number(params.units) || 10
-    case 'custom':
-      return Number(params.units) || 10
-    default:
-      return 10
-  }
-}
-
-/**
- * Compute activation for Output layers
- */
-function computeOutputActivation(params: Record<string, ParamValue>): string {
-  const outputType = params.outputType || 'multiclass'
-  
-  switch (outputType) {
-    case 'multiclass':
-      return 'softmax'
-    case 'binary':
-      return 'sigmoid'
-    case 'regression':
-      return 'linear'
-    case 'multilabel':
-      return 'sigmoid'
-    case 'custom':
-      return String(params.activation) || 'softmax'
-    default:
-      return 'softmax'
-  }
-}
-
-/**
- * Convert YAML layer to LayerDef format
+ * Convert YAML layer to LayerDef format using validated schema
  */
 function convertYAMLLayer(layerName: string, yamlLayer: YAMLLayer): LayerDef {
   const { metadata, parameters, keras, features } = yamlLayer
   
   // Convert parameters to formSpec and extract defaults
-  const formSpec: LayerFormField[] = []
-  const defaultParams: Record<string, ParamValue> = {}
+  const formSpec: LayerFormField[] = Object.entries(parameters).map(([key, param]) => 
+    convertParameter(key, param)
+  )
   
-  Object.entries(parameters).forEach(([key, param]) => {
-    formSpec.push(convertParameter(key, param))
-    if (param.default !== undefined) {
-      defaultParams[key] = param.default
-    }
-  })
+  const defaultParams: Record<string, LayerParamValue> = Object.fromEntries(
+    Object.entries(parameters)
+      .filter(([, param]) => param.default !== undefined)
+      .map(([key, param]) => [key, param.default!])
+  )
 
   return {
     type: layerName,
@@ -289,29 +230,32 @@ function convertYAMLLayer(layerName: string, yamlLayer: YAMLLayer): LayerDef {
     description: metadata.description,
     defaultParams,
     formSpec,
-    codeGen: (params: Record<string, ParamValue>) => {
-      return generateCodeFromTemplate(keras.code_template, params, layerName)
-    },
+    codeGen: (params: Record<string, LayerParamValue>) => 
+      TemplateProcessor.generateCode(keras.code_template, params, layerName),
     kerasImport: keras.import,
     supportsMultiplier: features?.supports_multiplier || false
   }
 }
 
 /**
- * Load layer definitions from YAML file
+ * Load layer definitions from YAML file with Zod validation
  */
 export async function loadLayersFromYAML(yamlContent: string): Promise<Record<string, LayerDef>> {
   try {
-    const config = yaml.load(yamlContent) as YAMLLayerConfig
-    const layerDefs: Record<string, LayerDef> = {}
-
-    // Convert each YAML layer to LayerDef format
-    Object.entries(config.layers).forEach(([layerName, yamlLayer]) => {
-      layerDefs[layerName] = convertYAMLLayer(layerName, yamlLayer)
-    })
-
-    return layerDefs
+    const rawConfig = yaml.load(yamlContent)
+    const config = YAMLLayerConfigSchema.parse(rawConfig)
+    
+    return Object.fromEntries(
+      Object.entries(config.layers).map(([layerName, yamlLayer]) => [
+        layerName,
+        convertYAMLLayer(layerName, yamlLayer)
+      ])
+    )
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      console.error('YAML validation errors:', error.errors)
+      throw new Error(`Invalid YAML configuration: ${error.errors.map(e => e.message).join(', ')}`)
+    }
     console.error('Error loading YAML configuration:', error)
     throw error
   }
@@ -321,45 +265,46 @@ export async function loadLayersFromYAML(yamlContent: string): Promise<Record<st
 let cachedYamlContent: string | null = null
 
 /**
- * Load layer categories from YAML
+ * Load layer categories from YAML with validation
  */
 export function loadCategoriesFromYAML(yamlContent: string) {
   try {
-    const config = yaml.load(yamlContent) as YAMLLayerConfig
+    const rawConfig = yaml.load(yamlContent)
+    const config = YAMLLayerConfigSchema.parse(rawConfig)
     return config.categories
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      console.error('YAML validation errors:', error.errors)
+      throw new Error(`Invalid YAML configuration: ${error.errors.map(e => e.message).join(', ')}`)
+    }
     console.error('Error loading categories from YAML:', error)
     throw error
   }
 }
 
 /**
- * Load categories with their associated layers
+ * Load categories with their associated layers with validation
  */
 export function loadCategoriesWithLayers(yamlContent: string) {
   try {
-    const config = yaml.load(yamlContent) as YAMLLayerConfig
-    const categories = config.categories
-    const layers = config.layers
+    const rawConfig = yaml.load(yamlContent)
+    const config = YAMLLayerConfigSchema.parse(rawConfig)
     
-    // Create a mapping of category key to layer names
-    const categoryLayerMap: Record<string, string[]> = {}
-    
-    // Initialize each category with empty array
-    Object.keys(categories).forEach(categoryKey => {
-      categoryLayerMap[categoryKey] = []
-    })
+    // Create category-layer mapping
+    const categoryLayerMap = Object.fromEntries(
+      Object.keys(config.categories).map(categoryKey => [categoryKey, []])
+    ) as Record<string, string[]>
     
     // Map layers to their categories
-    Object.entries(layers).forEach(([layerName, layerDef]) => {
+    Object.entries(config.layers).forEach(([layerName, layerDef]) => {
       const categoryKey = layerDef.metadata.category
       if (categoryLayerMap[categoryKey]) {
         categoryLayerMap[categoryKey].push(layerName)
       }
     })
     
-    // Transform to the format expected by BlockPalette
-    return Object.entries(categories).map(([categoryKey, categoryDef]) => ({
+    // Transform to BlockPalette format
+    return Object.entries(config.categories).map(([categoryKey, categoryDef]) => ({
       name: categoryDef.name,
       color: categoryDef.color,
       bgColor: categoryDef.bg_color,
@@ -369,6 +314,10 @@ export function loadCategoriesWithLayers(yamlContent: string) {
       layerTypes: categoryLayerMap[categoryKey] || []
     }))
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      console.error('YAML validation errors:', error.errors)
+      throw new Error(`Invalid YAML configuration: ${error.errors.map(e => e.message).join(', ')}`)
+    }
     console.error('Error loading categories with layers from YAML:', error)
     throw error
   }
