@@ -5,7 +5,6 @@
 import type { DAGResult, LayerObject } from './dag-parser'
 import { generateLayerCode, getUsedKerasImports } from './layer-defs'
 import { computeInputShape } from './input-layer-utils'
-import { formatKerasCode } from './code-formatter'
 
 /**
  * Generates Keras/TensorFlow Python code from a DAG structure
@@ -92,7 +91,7 @@ export function generateKerasCode(layers: LayerObject[]): string {
     'model.summary()'
   ]
 
-  return formatKerasCode([...imports, ...modelLines, ...compilationLines].join('\n'))
+  return [...imports, ...modelLines, ...compilationLines].join('\n')
 }
 
 /**
@@ -289,5 +288,5 @@ export function generateFunctionalKerasCode(dagResult: DAGResult): string {
     'model.summary()'
   ]
 
-  return formatKerasCode([...codeLines, ...compilationLines].join('\n'))
+  return [...codeLines, ...compilationLines].join('\n')
 }
