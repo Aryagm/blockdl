@@ -59,7 +59,8 @@ The function supports the following layer types with their respective shape comp
 ### Basic Usage
 
 ```typescript
-import { computeShapes, parseGraphToDAG } from './lib/graph-utils'
+import { parseGraphToDAG } from './lib/dag-parser'
+import { computeShapes } from './lib/shape-computation'
 import type { Node, Edge } from '@xyflow/react'
 
 // Create nodes and edges representing your neural network

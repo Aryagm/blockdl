@@ -5,12 +5,8 @@ import { Check, Copy, Download } from "lucide-react";
 
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import {
-  parseGraphToDAG,
-  generateKerasCode,
-  generateFunctionalKerasCode,
-  type DAGResult,
-} from "../lib/graph-utils";
+import { parseGraphToDAG, type DAGResult } from "../lib/dag-parser";
+import { generateKerasCode, generateFunctionalKerasCode } from "../lib/code-generation";
 import { useFlowStore } from "../lib/flow-store";
 import { cn } from "../lib/utils";
 

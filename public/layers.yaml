@@ -90,7 +90,6 @@ layers:
       icon: "📥"
       description: "Input layer for data"
       tags: ["input", "data"]
-      documentation: "https://keras.io/api/layers/core_layers/input/"
 
     visual:
       handles:
@@ -274,7 +273,6 @@ layers:
       icon: "🔗"
       description: "Fully connected layer"
       tags: ["dense", "fully_connected"]
-      documentation: "https://keras.io/api/layers/core_layers/dense/"
 
     visual:
       handles:
@@ -331,7 +329,6 @@ layers:
       icon: "🔲"
       description: "2D convolution layer"
       tags: ["convolution", "cnn", "2d"]
-      documentation: "https://keras.io/api/layers/convolution_layers/convolution2d/"
 
     visual:
       handles:
@@ -687,15 +684,6 @@ layers:
       import: "LSTM"
       code_template: |
         LSTM({{units}}, return_sequences={{return_sequences}})
-      multiplier_template: |
-        {% if multiplier == 1 %}
-        {{layer_code}}
-        {% elif multiplier <= 5 %}
-        {% for i in range(multiplier) %}{{layer_code}}{% if not loop.last %},{% endif %}{% endfor %}
-        {% else %}
-        # Add {{multiplier}} LSTM layers with {{units}} units
-        *[{{layer_code}} for _ in range({{multiplier}})]
-        {% endif %}
       shape_computation: "lstm_layer"
 
   GRU:

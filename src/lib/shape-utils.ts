@@ -3,7 +3,8 @@
  * This module provides functions to compute output shapes for different layer types
  */
 
-import { computeShapes, parseGraphToDAG, type ShapeError } from './graph-utils'
+import { parseGraphToDAG } from './dag-parser'
+import { computeShapes, type ShapeError } from './shape-computation'
 import type { Node, Edge } from '@xyflow/react'
 
 /**
