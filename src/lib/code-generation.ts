@@ -52,12 +52,12 @@ export function generateKerasCode(layers: LayerObject[]): string {
             const trimmedLine = line.trim()
             if (trimmedLine.startsWith('*[') && trimmedLine.endsWith(']')) {
               // Spread operator syntax - add comma unless it's the last layer
-              modelLines.push(`    ${line}${isLastLayer ? '' : ','}`)
+              modelLines.push(`${line}${isLastLayer ? '' : ','}`)
             } else {
               // Regular layer code - add comma only if it doesn't already end with one
               const hasComma = trimmedLine.endsWith(',')
               const needsComma = !hasComma && !isLastLayer
-              modelLines.push(`    ${line}${needsComma ? ',' : ''}`)
+              modelLines.push(`${line}${needsComma ? ',' : ''}`)
             }
           }
         })
