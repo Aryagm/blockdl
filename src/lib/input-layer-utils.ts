@@ -1,17 +1,13 @@
 /**
- * Input layer utilities for handling different input types and computing shapes
+ * Input layer utilities for YAML-driven shape computation
  */
 
 import { computeYAMLDrivenShape } from './yaml-shape-loader'
 import type { LayerParams } from './layer-defs'
 
-export interface InputShapeResult {
-  shape: string
-  dimensions: number[]
-}
-
 /**
  * Computes shape string from input layer parameters using YAML-driven computation
+ * Used by code generation and shape computation systems.
  */
 export async function computeInputShape(params: Record<string, unknown>): Promise<string> {
   try {
@@ -20,6 +16,9 @@ export async function computeInputShape(params: Record<string, unknown>): Promis
     if (shapeResult.shape) {
       // Convert shape array to string format
       return `(${shapeResult.shape.join(', ')})`
+    }
+    if (shapeResult.error) {
+      console.warn('YAML-driven shape computation error:', shapeResult.error)
     }
   } catch (error) {
     console.warn('YAML-driven shape computation failed, using fallback:', error)
@@ -31,39 +30,4 @@ export async function computeInputShape(params: Record<string, unknown>): Promis
   }
   
   return '(784,)'; // Default fallback
-}
-
-/**
- * Gets display shape for input layers in the UI using YAML-driven computation
- */
-export async function getInputDisplayShape(params: Record<string, unknown>): Promise<string> {
-  try {
-    // Use YAML-driven shape computation for Input layer
-    const shapeResult = await computeYAMLDrivenShape('Input', [], params as LayerParams)
-    if (shapeResult.shape) {
-      // Convert shape array to display format using × separator
-      return shapeResult.shape.join('×')
-    }
-  } catch (error) {
-    console.warn('YAML-driven shape computation failed for display, using fallback:', error)
-  }
-  
-  // Fallback to default if YAML computation fails
-  return '28×28×1'
-}
-
-/**
- * Gets input type label for display
- */
-export function getInputTypeLabel(inputType: string): string {
-  const inputTypeLabels: Record<string, string> = {
-    'image_grayscale': 'Grayscale',
-    'image_color': 'Color', 
-    'image_custom': 'Custom Image',
-    'flat_data': 'Flattened',
-    'sequence': 'Sequence',
-    'custom': 'Custom'
-  };
-  
-  return inputTypeLabels[inputType] || inputType;
 }

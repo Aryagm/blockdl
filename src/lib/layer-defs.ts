@@ -1,16 +1,23 @@
 /**
  * Centralized layer definitions registry for BlockDL
- * Layer definitions are loaded from YAML configuration at startup
+ * 
+ * This module serves as the main API for accessing layer definitions loaded from YAML.
+ * It provides type-safe access to layer metadata, parameters, and code generation.
  */
 
 import { loadCategoriesWithLayers, getCachedYamlContent } from './yaml-layer-loader'
 
-// Type for parameter values - matching the YAML loader
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
+/** Valid types for layer parameter values */
 export type LayerParamValue = string | number | boolean
 
-// Type for layer parameters object
+/** Layer parameters as key-value pairs */
 export type LayerParams = Record<string, LayerParamValue>
 
+/** Form field configuration for layer parameter editing */
 export interface LayerFormField {
   key: string
   label: string
@@ -22,11 +29,12 @@ export interface LayerFormField {
   show?: (params: Record<string, LayerParamValue>) => boolean
 }
 
+/** Complete layer definition with metadata and configuration */
 export interface LayerDef {
   type: string
   icon: string
   description: string
-  category: string  // Added category field
+  category: string
   defaultParams: Record<string, LayerParamValue>
   formSpec: LayerFormField[]
   codeGen: (params: Record<string, LayerParamValue>) => string
@@ -34,13 +42,21 @@ export interface LayerDef {
   supportsMultiplier?: boolean
 }
 
-// Layer definitions - populated from YAML at startup
+// ============================================================================
+// LAYER REGISTRY
+// ============================================================================
+
+/** Runtime registry of all loaded layer definitions */
 export const layerDefs: Record<string, LayerDef> = {}
 
-// Utility functions for accessing layer definitions
+// ============================================================================
+// CORE API FUNCTIONS
+// ============================================================================
 
 /**
  * Get layer definition by type
+ * @param type - Layer type identifier
+ * @returns Layer definition or undefined if not found
  */
 export function getLayerDef(type: string): LayerDef | undefined {
   return layerDefs[type]
@@ -48,6 +64,8 @@ export function getLayerDef(type: string): LayerDef | undefined {
 
 /**
  * Get default parameters for a layer type
+ * @param type - Layer type identifier
+ * @returns Default parameters object
  */
 export function getDefaultParams(type: string): Record<string, LayerParamValue> {
   return layerDefs[type]?.defaultParams || {}
@@ -55,13 +73,16 @@ export function getDefaultParams(type: string): Record<string, LayerParamValue> 
 
 /**
  * Get icon for a layer type
+ * @param type - Layer type identifier  
+ * @returns Icon emoji or default wrench emoji
  */
 export function getLayerIcon(type: string): string {
   return layerDefs[type]?.icon || '🔧'
 }
 
 /**
- * Get all available layer types
+ * Get all available layer types with basic metadata
+ * @returns Array of layer type information
  */
 export function getLayerTypes(): Array<{ type: string; icon: string; description: string }> {
   return Object.entries(layerDefs).map(([type, def]) => ({
@@ -71,8 +92,15 @@ export function getLayerTypes(): Array<{ type: string; icon: string; description
   }))
 }
 
+// ============================================================================
+// CODE GENERATION FUNCTIONS
+// ============================================================================
+
 /**
- * Generate code for a layer with given parameters
+ * Generate Keras code for a layer with given parameters
+ * @param type - Layer type identifier
+ * @param params - Layer parameter values
+ * @returns Generated Keras code string
  */
 export function generateLayerCode(type: string, params: Record<string, LayerParamValue>): string {
   const layerDef = layerDefs[type]
@@ -83,7 +111,9 @@ export function generateLayerCode(type: string, params: Record<string, LayerPara
 }
 
 /**
- * Get used Keras imports from a list of layer types
+ * Get required Keras imports for a list of layer types
+ * @param layerTypes - Array of layer type identifiers
+ * @returns Array of unique Keras import names
  */
 export function getUsedKerasImports(layerTypes: string[]): string[] {
   const imports = new Set<string>()
@@ -91,7 +121,7 @@ export function getUsedKerasImports(layerTypes: string[]): string[] {
   layerTypes.forEach(type => {
     const layerDef = layerDefs[type]
     if (layerDef?.kerasImport) {
-      // Split by comma in case multiple imports are specified
+      // Handle comma-separated imports
       layerDef.kerasImport.split(',').forEach(imp => {
         imports.add(imp.trim())
       })
@@ -101,20 +131,25 @@ export function getUsedKerasImports(layerTypes: string[]): string[] {
   return Array.from(imports)
 }
 
+// ============================================================================
+// YAML INTEGRATION FUNCTIONS
+// ============================================================================
+
 /**
- * Get layer categories with their associated layers from YAML
+ * Get layer categories with their associated layers from YAML configuration
+ * @returns Array of category objects with layer information
  */
 export function getLayerCategoriesFromYAML() {
   const yamlContent = getCachedYamlContent()
   if (!yamlContent) {
-    // Don't log a warning during initial load - this is expected
+    // Silent return during initial load - this is expected behavior
     return []
   }
   
   try {
     return loadCategoriesWithLayers(yamlContent)
   } catch (error) {
-    console.error('Error getting categories from YAML:', error)
+    console.error('Error loading categories from YAML:', error)
     return []
   }
 }

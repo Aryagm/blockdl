@@ -1,31 +1,60 @@
 /**
- * Simplified YAML-driven shape computation loader
+ * YAML-driven shape computation loader
  * 
- * This module loads shape computation configurations using cached YAML content
- * for optimal performance during object moves.
+ * Loads shape computation configurations from cached YAML content.
+ * All layer definitions and shape computation methods are driven by YAML configuration.
  */
 
-import { computeEnhancedLayerShape, type ShapeComputationResult } from './enhanced-shape-computation'
+import { computeShapeEnhanced, type ShapeComputationResult } from './enhanced-shape-computation'
 import { getCachedYamlContent } from './yaml-layer-loader'
 import type { LayerParams } from './layer-defs'
+import yaml from 'js-yaml'
+
+// Cache for parsed YAML content to avoid repeated parsing
+let parsedYamlCache: Record<string, unknown> | null = null
 
 /**
- * Loads YAML content from cache (loaded once at startup)
+ * Get cached and parsed YAML content
  */
-async function loadYAMLContent(): Promise<Record<string, unknown> | null> {
+function getCachedParsedYAML(): Record<string, unknown> | null {
+  if (parsedYamlCache) {
+    return parsedYamlCache
+  }
+
+  const yamlText = getCachedYamlContent()
+  if (!yamlText) {
+    console.error('YAML content not cached. Ensure initializeLayerDefs() was called at startup.')
+    return null
+  }
+
   try {
-    const yamlText = getCachedYamlContent()
-    if (!yamlText) {
-      console.error('YAML content not cached. Ensure initializeLayerDefs() was called at startup.')
-      return null
-    }
-    
-    const YAML = await import('yaml')
-    return YAML.parse(yamlText)
+    parsedYamlCache = yaml.load(yamlText) as Record<string, unknown>
+    return parsedYamlCache
   } catch (error) {
     console.error('Failed to parse cached YAML content:', error)
     return null
   }
+}
+
+/**
+ * Extract shape computation method name from YAML layer definition
+ */
+function getShapeComputationMethod(yamlContent: Record<string, unknown>, layerType: string): string | null {
+  const layers = yamlContent.layers as Record<string, Record<string, unknown>>
+  const layerDef = layers?.[layerType]
+  
+  if (!layerDef) {
+    return null
+  }
+
+  // Navigate through frameworks configuration - this structure is defined in YAML
+  const frameworks = layerDef.frameworks as Record<string, Record<string, unknown>>
+  const metadata = yamlContent.metadata as Record<string, unknown>
+  const settings = metadata?.settings as Record<string, unknown>
+  const defaultFramework = settings?.default_framework as string || 'keras'
+  const frameworkConfig = frameworks?.[defaultFramework] as Record<string, unknown>
+  
+  return frameworkConfig?.shape_computation as string || null
 }
 
 /**
@@ -36,50 +65,24 @@ export async function computeYAMLDrivenShape(
   inputShapes: number[][],
   params: LayerParams
 ): Promise<ShapeComputationResult> {
-  try {
-    // Load YAML content directly
-    const yamlContent = await loadYAMLContent()
-    
-    if (!yamlContent || !yamlContent.layers) {
-      return {
-        shape: null,
-        error: `YAML content not available for layer type: ${layerType}`
-      }
-    }
-
-    // Get layer definition
-    const layers = yamlContent.layers as Record<string, Record<string, unknown>>
-    const layerDef = layers?.[layerType]
-    let shapeComputationName: string | undefined
-    
-    if (layerDef) {
-      const frameworks = layerDef.frameworks as Record<string, Record<string, unknown>>
-      const keras = frameworks?.keras as Record<string, unknown>
-      shapeComputationName = keras?.shape_computation as string
-    }
-
-    // Use enhanced shape computation with detailed error messages
-    const enhancedParams: LayerParams = {}
-    for (const [key, value] of Object.entries(params)) {
-      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-        enhancedParams[key] = value
-      } else {
-        enhancedParams[key] = String(value)
-      }
-    }
-    
-    const enhancedResult = computeEnhancedLayerShape(layerType, inputShapes, enhancedParams, shapeComputationName)
-    
-    // Convert enhanced result to legacy format for now
-    return {
-      shape: enhancedResult.shape,
-      error: enhancedResult.error || (enhancedResult.warning ? `Warning: ${enhancedResult.warning}` : undefined)
-    }
-    
-  } catch (error) {
+  const yamlContent = getCachedParsedYAML()
+  
+  if (!yamlContent?.layers) {
     return {
       shape: null,
-      error: `YAML-driven shape computation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      error: `YAML configuration not available for layer type: ${layerType}`
     }
   }
+
+  const shapeComputationName = getShapeComputationMethod(yamlContent, layerType)
+  
+  if (!shapeComputationName) {
+    return {
+      shape: null,
+      error: `No shape computation method defined for layer type: ${layerType}`
+    }
+  }
+
+  // Delegate to enhanced shape computation with existing params (no conversion needed)
+  return computeShapeEnhanced(shapeComputationName, inputShapes, params)
 }

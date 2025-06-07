@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { addEdge, applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
 import type { Node, Edge, NodeChange, EdgeChange, Connection } from '@xyflow/react'
-import { computeNetworkShapes } from './shape-utils'
+import { parseGraphToDAG } from './dag-parser'
+import { computeShapes } from './shape-computation'
 import { computeYAMLDrivenShape } from './yaml-shape-loader'
 import type { LayerParams } from './layer-defs'
 
@@ -19,36 +20,45 @@ interface FlowState {
   updateShapeErrors: () => Promise<void>
 }
 
+// Debouncing utility for shape error updates
+let shapeUpdateTimeout: NodeJS.Timeout | null = null
+
+const scheduleShapeUpdate = (updateFn: () => Promise<void>) => {
+  if (shapeUpdateTimeout) {
+    clearTimeout(shapeUpdateTimeout)
+  }
+  shapeUpdateTimeout = setTimeout(() => {
+    updateFn()
+    shapeUpdateTimeout = null
+  }, 100) // Debounce rapid updates
+}
+
 export const useFlowStore = create<FlowState>((set, get) => ({
   nodes: [],
   edges: [],
 
   setNodes: (nodes) => {
     set({ nodes })
-    // Update shape errors after setting nodes
-    setTimeout(() => get().updateShapeErrors(), 0)
+    scheduleShapeUpdate(() => get().updateShapeErrors())
   },
 
   setEdges: (edges) => {
     set({ edges })
-    // Update shape errors after setting edges
-    setTimeout(() => get().updateShapeErrors(), 0)
+    scheduleShapeUpdate(() => get().updateShapeErrors())
   },
 
   onNodesChange: (changes) => {
     set({
       nodes: applyNodeChanges(changes, get().nodes),
     })
-    // Update shape errors after node changes
-    setTimeout(() => get().updateShapeErrors(), 0)
+    scheduleShapeUpdate(() => get().updateShapeErrors())
   },
 
   onEdgesChange: (changes) => {
     set({
       edges: applyEdgeChanges(changes, get().edges),
     })
-    // Update shape errors after edge changes
-    setTimeout(() => get().updateShapeErrors(), 0)
+    scheduleShapeUpdate(() => get().updateShapeErrors())
   },
 
   onConnect: (connection) => {
@@ -60,20 +70,23 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({
       edges: addEdge(edgeWithType, get().edges),
     })
-    // Update shape errors after connection
-    setTimeout(() => get().updateShapeErrors(), 0)
+    scheduleShapeUpdate(() => get().updateShapeErrors())
   },
 
   addNode: (node) => {
     set({
       nodes: [...get().nodes, node],
     })
-    // Update shape errors after adding node
-    setTimeout(() => get().updateShapeErrors(), 0)
+    scheduleShapeUpdate(() => get().updateShapeErrors())
   },
 
   updateShapeErrors: async () => {
     const { nodes, edges } = get()
+    
+    // Early return if no nodes to process
+    if (nodes.length === 0) {
+      return
+    }
     
     try {
       // Find the input node to determine the input shape
@@ -93,24 +106,71 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         }
       }
       
-      const { errors } = await computeNetworkShapes(nodes, edges, inputShape)
+      // Parse the graph into a DAG
+      const dagResult = parseGraphToDAG(nodes, edges)
+      
+      if (!dagResult.isValid) {
+        const errorMap = new Map<string, string>()
+        dagResult.errors.forEach(error => {
+          errorMap.set('graph', error)
+        })
+        
+        // Update nodes with error information
+        let hasChanges = false
+        const updatedNodes = nodes.map(node => {
+          const hasError = errorMap.has('graph')
+          const errorMessage = errorMap.get('graph')
+          
+          if (node.data.hasShapeError !== hasError || node.data.shapeErrorMessage !== errorMessage) {
+            hasChanges = true
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                hasShapeError: hasError,
+                shapeErrorMessage: errorMessage
+              }
+            }
+          }
+          return node
+        })
+        
+        if (hasChanges) {
+          set({ nodes: updatedNodes })
+        }
+        return
+      }
+      
+      // Compute shapes for each node
+      const { errors } = await computeShapes(dagResult, inputShape)
       const errorMap = new Map<string, string>()
       
       errors.forEach((error: { nodeId: string; message: string }) => {
         errorMap.set(error.nodeId, error.message)
       })
       
-      // Update nodes with error information
-      const updatedNodes = nodes.map(node => ({
-        ...node,
-        data: {
-          ...node.data,
-          hasShapeError: errorMap.has(node.id),
-          shapeErrorMessage: errorMap.get(node.id)
+      // Update nodes with error information - optimize comparison
+      let hasChanges = false
+      const updatedNodes = nodes.map(node => {
+        const hasError = errorMap.has(node.id)
+        const errorMessage = errorMap.get(node.id)
+        
+        if (node.data.hasShapeError !== hasError || node.data.shapeErrorMessage !== errorMessage) {
+          hasChanges = true
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              hasShapeError: hasError,
+              shapeErrorMessage: errorMessage
+            }
+          }
         }
-      }))
+        return node
+      })
       
-      if (JSON.stringify(updatedNodes) !== JSON.stringify(nodes)) {
+      // Only update state if there are actual changes
+      if (hasChanges) {
         set({ nodes: updatedNodes })
       }
     } catch (error) {

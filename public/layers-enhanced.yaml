@@ -152,9 +152,6 @@ layers:
           - value: "sequence"
             label: "Sequence Data (seq_len, features)"
             description: "Time series or text data"
-          - value: "custom"
-            label: "Custom Shape"
-            description: "Define your own input shape"
         validation:
           required: true
         ui:
@@ -251,22 +248,6 @@ layers:
         ui:
           group: "shape"
           order: 7
-
-      customShape:
-        type: "text"
-        label: "Custom Shape"
-        description: "Define a custom input shape (e.g., (784,) or (28, 28, 1))"
-        default: "(784,)"
-        validation:
-          pattern: "^\\([0-9, ]+\\)$"
-          error_message: "Shape must be in format (dim1, dim2, ...) like (784,) or (28, 28, 1)"
-        conditional:
-          show_when:
-            inputType: ["custom"]
-        ui:
-          placeholder: "(784,)"
-          group: "shape"
-          order: 8
 
     features:
       supports_multiplier: false
@@ -1581,7 +1562,7 @@ enhanced_shape_computation:
       type: "enhanced"
       rules:
         - condition: "input_dims > 2"
-          warning: "Dense layer receiving {input_dims}D input ({input_shape}) will be automatically flattened. Consider adding explicit Flatten layer before Dense for clarity."
+          error: "Dense layer cannot directly connect to {input_dims}D input ({input_shape}). Add a Flatten layer before Dense to convert multi-dimensional input to 1D."
         - condition: "input_dims === 1 && input_shape[0] > 10000"
           warning: "Large input size ({input_shape[0]}) may cause memory issues. Consider using dimensionality reduction."
         - condition: "units > 4096"

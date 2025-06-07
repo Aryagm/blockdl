@@ -132,15 +132,30 @@ The function returns detailed error information for various scenarios:
 To integrate shape computation with the visual editor:
 
 ```typescript
-import { computeNetworkShapes } from './lib/shape-utils'
+import { parseGraphToDAG } from './lib/dag-parser'
+import { computeShapes } from './lib/shape-computation'
 
 // In your React component
-const handleShapeComputation = () => {
-  const result = computeNetworkShapes(nodes, edges, '(784,)')
+const handleShapeComputation = async () => {
+  // Parse the graph into a DAG
+  const dagResult = parseGraphToDAG(nodes, edges)
   
-  if (result.success) {
-    // Update UI to show computed shapes
-    setNodeShapes(result.nodeShapes)
+  if (!dagResult.isValid) {
+    // Display DAG validation errors
+    setShapeErrors(dagResult.errors.map(error => ({ nodeId: 'graph', message: error })))
+    return
+  }
+  
+  // Compute shapes for each node
+  const result = await computeShapes(dagResult, '(784,)')
+  
+  if (result.errors.length === 0) {
+    // Update UI to show computed shapes - convert to display format
+    const nodeShapes = new Map<string, string>()
+    for (const [nodeId, shape] of result.nodeShapes.entries()) {
+      nodeShapes.set(nodeId, `(${shape.join(', ')})`)
+    }
+    setNodeShapes(nodeShapes)
   } else {
     // Display errors to user
     setShapeErrors(result.errors)

@@ -5,6 +5,7 @@
 import type { LayerObject } from './dag-parser'
 import { computeInputShape } from './input-layer-utils'
 import { computeYAMLDrivenShape } from './yaml-shape-loader'
+import { parseShape } from './utils'
 
 export interface ShapeError {
   nodeId: string
@@ -12,41 +13,17 @@ export interface ShapeError {
 }
 
 /**
- * Parses a tuple string like "(28, 28, 1)" or "(784,)" into a number array
- */
-function parseShape(shapeStr: string): number[] | null {
-  try {
-    // Remove whitespace and extract numbers from tuple format
-    const cleaned = shapeStr.trim()
-    if (!cleaned.startsWith('(') || !cleaned.endsWith(')')) {
-      return null
-    }
-    
-    const content = cleaned.slice(1, -1).trim()
-    if (content === '') return []
-    
-    return content.split(',').map(s => {
-      const num = parseInt(s.trim())
-      return isNaN(num) ? null : num
-    }).filter(n => n !== null) as number[]
-  } catch {
-    return null
-  }
-}
-
-/**
  * Walks the DAG, computes output shapes for each node, and returns computed shapes and errors
  */
-export async function computeShapes(dag: { orderedNodes: LayerObject[], edgeMap: Map<string, string[]> }, inputShape: string): Promise<{
-  errors: ShapeError[]
-  nodeShapes: Map<string, number[]>
-}> {
+export async function computeShapes(
+  dag: { orderedNodes: LayerObject[], edgeMap: Map<string, string[]> }, 
+  inputShape: string
+): Promise<{ errors: ShapeError[], nodeShapes: Map<string, number[]> }> {
   const errors: ShapeError[] = []
   const nodeShapes = new Map<string, number[]>()
   
-  // Parse the input shape
-  const parsedInputShape = parseShape(inputShape)
-  if (!parsedInputShape) {
+  // Validate input shape format
+  if (!parseShape(inputShape)) {
     errors.push({
       nodeId: 'input',
       message: `Invalid input shape format: ${inputShape}. Expected format like "(784,)" or "(28, 28, 1)"`
@@ -56,31 +33,26 @@ export async function computeShapes(dag: { orderedNodes: LayerObject[], edgeMap:
   
   // Process nodes in topological order
   for (const node of dag.orderedNodes) {
-    let outputShape: number[] | null = null
-    
     try {
+      let outputShape: number[] | null = null
+      
       if (node.type === 'Input') {
         // Input layer defines the initial shape
         const computedShape = await computeInputShape(node.params)
-        const nodeInputShape = parseShape(computedShape)
-        if (!nodeInputShape) {
+        outputShape = parseShape(computedShape)
+        
+        if (!outputShape) {
           errors.push({
             nodeId: node.id,
             message: `Invalid input shape in Input layer: ${computedShape}`
           })
           continue
         }
-        outputShape = nodeInputShape
       } else {
-        // Get input shapes for this node
-        const inputNodeIds: string[] = []
-        
-        // Find all nodes that connect to this node
-        for (const [sourceId, targets] of dag.edgeMap.entries()) {
-          if (targets.includes(node.id)) {
-            inputNodeIds.push(sourceId)
-          }
-        }
+        // Find input nodes for this layer
+        const inputNodeIds = Array.from(dag.edgeMap.entries())
+          .filter(([, targets]) => targets.includes(node.id))
+          .map(([sourceId]) => sourceId)
         
         if (inputNodeIds.length === 0) {
           errors.push({
@@ -90,8 +62,10 @@ export async function computeShapes(dag: { orderedNodes: LayerObject[], edgeMap:
           continue
         }
         
-        // Get input shapes
-        const inputShapes = inputNodeIds.map(id => nodeShapes.get(id)).filter(shape => shape !== undefined) as number[][]
+        // Get input shapes from connected nodes
+        const inputShapes = inputNodeIds
+          .map(id => nodeShapes.get(id))
+          .filter((shape): shape is number[] => shape !== undefined)
         
         if (inputShapes.length !== inputNodeIds.length) {
           errors.push({
@@ -101,10 +75,10 @@ export async function computeShapes(dag: { orderedNodes: LayerObject[], edgeMap:
           continue
         }
         
-        // Compute output shape using YAML-driven shape computation
+        // Compute output shape using YAML-driven computation
         const shapeResult = await computeYAMLDrivenShape(node.type, inputShapes, node.params)
         
-        if (shapeResult.error || shapeResult.shape === null) {
+        if (shapeResult.error || !shapeResult.shape) {
           errors.push({
             nodeId: node.id,
             message: shapeResult.error || `Could not compute output shape for ${node.type} layer`
@@ -115,16 +89,9 @@ export async function computeShapes(dag: { orderedNodes: LayerObject[], edgeMap:
         outputShape = shapeResult.shape
       }
       
-      if (outputShape === null) {
-        errors.push({
-          nodeId: node.id,
-          message: `Could not compute output shape for ${node.type} layer`
-        })
-        continue
+      if (outputShape) {
+        nodeShapes.set(node.id, outputShape)
       }
-      
-      // Store the computed shape
-      nodeShapes.set(node.id, outputShape)
       
     } catch (error) {
       errors.push({

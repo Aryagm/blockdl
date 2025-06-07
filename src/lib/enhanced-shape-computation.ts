@@ -1,11 +1,16 @@
 /**
- * Enhanced Shape Computation Registry with detailed error messages
+ * Enhanced Shape Computation with detailed error messages
  * 
- * This module provides enhanced shape computation functions that return detailed
- * validation messages instead of just null when validation fails.
+ * This module enhances the basic shape computation registry to provide detailed
+ * validation messages and warnings for better user experience.
  */
 
-type LayerParams = Record<string, any>
+import { 
+  shapeComputationRegistry, 
+  type ShapeComputeFunction
+} from './shape-computation-registry'
+
+type LayerParams = Record<string, string | number | boolean>
 
 /**
  * Shape computation result with detailed error information
@@ -25,454 +30,231 @@ export type EnhancedShapeComputeFunction = (
 ) => ShapeComputationResult
 
 /**
- * Enhanced shape computation registry with detailed validation
+ * Enhance a basic shape computation function with detailed error messages
  */
-export const enhancedShapeComputationRegistry: Record<string, EnhancedShapeComputeFunction> = {
-  // Input layer computation
-  input_layer: (_inputShapes, params) => {
-    // Input layers determine their own shape from parameters
-    if (params.computed_shape || params.shape) {
-      const shapeString = params.computed_shape || params.shape || '(784,)'
-      const shape = parseShapeString(shapeString)
+function enhanceShapeComputation(
+  basicFunction: ShapeComputeFunction,
+  layerType: string
+): EnhancedShapeComputeFunction {
+  return (inputShapes: number[][], params: LayerParams): ShapeComputationResult => {
+    try {
+      // Basic validation
+      if (inputShapes.length === 0 && layerType !== 'input_layer') {
+        return {
+          shape: null,
+          error: `${layerType} layer expects at least 1 input, but received ${inputShapes.length} inputs`
+        }
+      }
+
+      // Check for critical shape incompatibilities BEFORE attempting computation
+      const criticalError = getCriticalShapeError(layerType, inputShapes, params)
+      if (criticalError) {
+        return {
+          shape: null,
+          error: criticalError
+        }
+      }
+
+      const shape = basicFunction(inputShapes, params)
+      
       if (shape === null) {
         return {
           shape: null,
-          error: `Invalid shape format: ${shapeString}. Expected format like "(784,)" or "(28, 28, 1)"`
+          error: getDetailedErrorMessage(layerType, inputShapes, params)
         }
       }
+
       return { shape }
+    } catch (error) {
+      return {
+        shape: null,
+        error: `${layerType} computation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      }
     }
-    
-    // Compute shape from inputType and parameters
-    const inputType = params.inputType || 'image_grayscale'
-    
-    switch (inputType) {
-      case 'image_grayscale':
-        return { shape: [Number(params.height) || 28, Number(params.width) || 28, 1] }
-      case 'image_color':
-        return { shape: [Number(params.height) || 28, Number(params.width) || 28, 3] }
-      case 'image_custom':
-        return { shape: [Number(params.height) || 28, Number(params.width) || 28, Number(params.channels) || 1] }
-      case 'flat_data':
-        return { shape: [Number(params.flatSize) || 784] }
-      case 'sequence':
-        return { shape: [Number(params.seqLength) || 100, Number(params.features) || 128] }
-      case 'custom': {
-        const customShape = params.customShape || '(784,)'
-        const shape = parseShapeString(String(customShape))
-        if (shape === null) {
-          return {
-            shape: null,
-            error: `Invalid custom shape format: ${customShape}. Expected format like "(784,)" or "(28, 28, 1)"`
+  }
+}
+
+/**
+ * Generate detailed error messages for common shape computation failures
+ */
+function getDetailedErrorMessage(
+  layerType: string, 
+  inputShapes: number[][], 
+  params: LayerParams
+): string {
+  const inputShape = inputShapes[0]
+  
+  switch (layerType) {
+    case 'conv2d_layer':
+      if (!inputShape) return 'Conv2D layer requires an input connection'
+      if (inputShape.length !== 3) {
+        return `Conv2D layer expects 3D input (height, width, channels), but received ${inputShape.length}D input ${JSON.stringify(inputShape)}`
+      }
+      return 'Conv2D layer configuration is invalid. Check kernel_size, strides, and padding parameters.'
+      
+    case 'maxpool2d_layer':
+      if (!inputShape) return 'MaxPool2D layer requires an input connection'
+      if (inputShape.length !== 3) {
+        return `MaxPool2D layer expects 3D input (height, width, channels), but received ${inputShape.length}D input ${JSON.stringify(inputShape)}`
+      }
+      return 'MaxPool2D layer configuration is invalid. Check pool_size, strides, and padding parameters.'
+      
+    case 'dense_layer':
+      if (!inputShape) return 'Dense layer requires an input connection'
+      if (inputShape.length === 0) {
+        return 'Dense layer cannot process 0-dimensional input'
+      }
+      return 'Dense layer configuration is invalid. Check units parameter.'
+      
+    case 'flatten_layer':
+      if (!inputShape) return 'Flatten layer requires an input connection'
+      if (inputShape.length === 0) {
+        return 'Flatten layer cannot process 0-dimensional input'
+      }
+      return 'Flatten layer configuration is invalid'
+      
+    case 'merge_layer':
+      if (inputShapes.length < 2) {
+        return `Merge layer expects at least 2 inputs, but received ${inputShapes.length} inputs`
+      }
+      return 'Merge layer configuration is invalid. Check that input shapes are compatible for the specified merge mode.'
+
+    case 'input_layer':
+      if (params.computed_shape || params.shape) {
+        const shapeString = params.computed_shape || params.shape || '(784,)'
+        return `Invalid shape format: ${shapeString}. Expected format like "(784,)" or "(28, 28, 1)"`
+      }
+      return 'Input layer configuration is invalid. Check inputType and shape parameters.'
+      
+    default:
+      return `${layerType} layer configuration is invalid or incompatible with input shapes`
+  }
+}
+
+/**
+ * Generate critical errors for shape incompatibilities that should prevent execution
+ */
+function getCriticalShapeError(
+  layerType: string,
+  inputShapes: number[][],
+  params: LayerParams
+): string | undefined {
+  const inputShape = inputShapes[0]
+   switch (layerType) {
+    case 'dense_layer': {
+      // Dense layers connecting directly to multi-dimensional inputs without flatten is an error
+      if (inputShape && inputShape.length > 2) {
+        return `Dense layer cannot directly connect to ${inputShape.length}D input ${JSON.stringify(inputShape)}. Add a Flatten layer before Dense to convert multi-dimensional input to 1D.`
+      }
+      break
+    }
+
+    case 'conv2d_layer': {
+      // Conv2D requires exactly 3D input
+      if (inputShape && inputShape.length !== 3) {
+        return `Conv2D layer requires 3D input (height, width, channels), but received ${inputShape.length}D input ${JSON.stringify(inputShape)}. Check layer connections.`
+      }
+      break
+    }
+      
+    case 'maxpool2d_layer': {
+      // MaxPool2D requires exactly 3D input
+      if (inputShape && inputShape.length !== 3) {
+        return `MaxPool2D layer requires 3D input (height, width, channels), but received ${inputShape.length}D input ${JSON.stringify(inputShape)}. Check layer connections.`
+      }
+      break
+    }
+      
+    case 'lstm_layer':
+    case 'gru_layer': {
+      // LSTM/GRU require exactly 3D input
+      if (inputShape && inputShape.length !== 3) {
+        return `${layerType.toUpperCase()} layer requires 3D input (batch, timesteps, features), but received ${inputShape.length}D input ${JSON.stringify(inputShape)}. Check layer connections.`
+      }
+      break
+    }
+      
+    case 'embedding_layer': {
+      // Embedding layers can only handle 1D or 2D input
+      if (inputShape && inputShape.length > 2) {
+        return `Embedding layer accepts 1D or 2D input, but received ${inputShape.length}D input ${JSON.stringify(inputShape)}. Check layer connections.`
+      }
+      break
+    }
+      
+    case 'merge_layer': {
+      // Merge layers need at least 2 inputs
+      if (inputShapes.length < 2) {
+        return `Merge layer requires at least 2 inputs, but received ${inputShapes.length} inputs. Connect more layers to this merge layer.`
+      }
+      
+      // Check for dimensional compatibility between inputs
+      const firstShape = inputShapes[0]
+      const mode = String(params.mode) || 'concatenate'
+      
+      if (mode === 'concatenate') {
+        // For concatenate, all dimensions except concat axis must match
+        for (let i = 1; i < inputShapes.length; i++) {
+          const currentShape = inputShapes[i]
+          if (currentShape.length !== firstShape.length) {
+            return `Merge (concatenate) requires all inputs to have same number of dimensions. Input 1: ${firstShape.length}D ${JSON.stringify(firstShape)}, Input ${i + 1}: ${currentShape.length}D ${JSON.stringify(currentShape)}.`
           }
-        }
-        return { shape }
-      }
-      default:
-        return { shape: [784] } // Default fallback
-    }
-  },
-
-  // Enhanced Dense layer computation with proper validation
-  dense_layer: (inputShapes, params) => {
-    if (inputShapes.length !== 1) {
-      return {
-        shape: null,
-        error: `Dense layer expects exactly 1 input, but received ${inputShapes.length} inputs`
-      }
-    }
-    
-    const inputShape = inputShapes[0]
-    const units = Number(params.units) || Number(params.numClasses) || 128
-    
-    // Check if input is compatible with Dense layer
-    if (inputShape.length > 2) {
-      // Multi-dimensional input - Dense can handle this but we should warn
-      const totalElements = inputShape.reduce((acc, dim) => acc * dim, 1)
-      return {
-        shape: [units],
-        warning: `Dense layer receiving ${inputShape.length}D input ${JSON.stringify(inputShape)} will be automatically flattened to ${totalElements} features. Consider adding an explicit Flatten layer for clarity.`
-      }
-    }
-    
-    if (inputShape.length === 2) {
-      // 2D input is fine for Dense layers
-      return { shape: [units] }
-    }
-    
-    if (inputShape.length === 1) {
-      // 1D input is ideal for Dense layers
-      return { shape: [units] }
-    }
-    
-    // 0D input is invalid
-    return {
-      shape: null,
-      error: `Dense layer cannot process 0-dimensional input`
-    }
-  },
-
-  // Enhanced Conv2D layer computation
-  conv2d_layer: (inputShapes, params) => {
-    if (inputShapes.length !== 1) {
-      return {
-        shape: null,
-        error: `Conv2D layer expects exactly 1 input, but received ${inputShapes.length} inputs`
-      }
-    }
-    
-    const inputShape = inputShapes[0]
-    
-    // Conv2D requires exactly 3D input (height, width, channels)
-    if (inputShape.length !== 3) {
-      const shapeStr = JSON.stringify(inputShape)
-      if (inputShape.length === 1) {
-        return {
-          shape: null,
-          error: `Conv2D layer expects 3D input (height, width, channels), but received 1D input ${shapeStr}. Consider using Dense layers for 1D data, or reshape your data to 3D.`
-        }
-      } else if (inputShape.length === 2) {
-        return {
-          shape: null,
-          error: `Conv2D layer expects 3D input (height, width, channels), but received 2D input ${shapeStr}. If this is sequence data, consider using Conv1D or LSTM layers. If this is image data, specify the channel dimension.`
         }
       } else {
-        return {
-          shape: null,
-          error: `Conv2D layer expects 3D input (height, width, channels), but received ${inputShape.length}D input ${shapeStr}.`
-        }
-      }
-    }
-    
-    const [inputHeight, inputWidth] = inputShape
-    const filters = Number(params.filters) || 32
-    const kernelSize = parseKernelSize(String(params.kernel_size) || '(3,3)')
-    const strides = parseKernelSize(String(params.strides) || '(1,1)')
-    const padding = String(params.padding) || 'same'
-    
-    if (!kernelSize) {
-      return {
-        shape: null,
-        error: `Invalid kernel_size format: ${params.kernel_size}. Expected format like "(3,3)" or "3"`
-      }
-    }
-    
-    if (!strides) {
-      return {
-        shape: null,
-        error: `Invalid strides format: ${params.strides}. Expected format like "(1,1)" or "1"`
-      }
-    }
-    
-    let outputHeight: number
-    let outputWidth: number
-    
-    if (padding === 'same') {
-      outputHeight = Math.ceil(inputHeight / strides[0])
-      outputWidth = Math.ceil(inputWidth / strides[1])
-    } else { // 'valid'
-      outputHeight = Math.floor((inputHeight - kernelSize[0]) / strides[0]) + 1
-      outputWidth = Math.floor((inputWidth - kernelSize[1]) / strides[1]) + 1
-    }
-    
-    // Check for invalid output dimensions
-    if (outputHeight <= 0 || outputWidth <= 0) {
-      return {
-        shape: null,
-        error: `Conv2D configuration results in invalid output dimensions: ${outputHeight}x${outputWidth}. Check kernel_size, strides, and padding parameters.`
-      }
-    }
-    
-    return { shape: [outputHeight, outputWidth, filters] }
-  },
-
-  // Enhanced MaxPool2D layer computation
-  maxpool2d_layer: (inputShapes, params) => {
-    if (inputShapes.length !== 1) {
-      return {
-        shape: null,
-        error: `MaxPool2D layer expects exactly 1 input, but received ${inputShapes.length} inputs`
-      }
-    }
-    
-    const inputShape = inputShapes[0]
-    
-    if (inputShape.length !== 3) {
-      const shapeStr = JSON.stringify(inputShape)
-      return {
-        shape: null,
-        error: `MaxPool2D layer expects 3D input (height, width, channels), but received ${inputShape.length}D input ${shapeStr}.`
-      }
-    }
-    
-    const [inputHeight, inputWidth, channels] = inputShape
-    const poolSize = parseKernelSize(String(params.pool_size) || '(2,2)')
-    const stridesParam = params.strides || params.pool_size || '(2,2)'
-    const strides = parseKernelSize(String(stridesParam))
-    const padding = String(params.padding) || 'valid'
-    
-    if (!poolSize) {
-      return {
-        shape: null,
-        error: `Invalid pool_size format: ${params.pool_size}. Expected format like "(2,2)" or "2"`
-      }
-    }
-    
-    if (!strides) {
-      return {
-        shape: null,
-        error: `Invalid strides format: ${stridesParam}. Expected format like "(2,2)" or "2"`
-      }
-    }
-    
-    let outputHeight: number
-    let outputWidth: number
-    
-    if (padding === 'same') {
-      outputHeight = Math.ceil(inputHeight / strides[0])
-      outputWidth = Math.ceil(inputWidth / strides[1])
-    } else { // 'valid'
-      outputHeight = Math.floor((inputHeight - poolSize[0]) / strides[0]) + 1
-      outputWidth = Math.floor((inputWidth - poolSize[1]) / strides[1]) + 1
-    }
-    
-    // Check for invalid output dimensions
-    if (outputHeight <= 0 || outputWidth <= 0) {
-      return {
-        shape: null,
-        error: `MaxPool2D configuration results in invalid output dimensions: ${outputHeight}x${outputWidth}. Check pool_size, strides, and padding parameters.`
-      }
-    }
-    
-    return { shape: [outputHeight, outputWidth, channels] }
-  },
-
-  // Enhanced Flatten layer computation
-  flatten_layer: (inputShapes, _params) => {
-    if (inputShapes.length !== 1) {
-      return {
-        shape: null,
-        error: `Flatten layer expects exactly 1 input, but received ${inputShapes.length} inputs`
-      }
-    }
-    
-    const inputShape = inputShapes[0]
-    
-    if (inputShape.length === 0) {
-      return {
-        shape: null,
-        error: `Flatten layer cannot process 0-dimensional input`
-      }
-    }
-    
-    if (inputShape.length === 1) {
-      return {
-        shape: inputShape,
-        warning: `Input is already 1D ${JSON.stringify(inputShape)}, Flatten layer has no effect`
-      }
-    }
-    
-    // Flatten all dimensions into one
-    const totalElements = inputShape.reduce((acc, dim) => acc * dim, 1)
-    return { shape: [totalElements] }
-  },
-
-  // Shape-preserving layers with validation
-  preserve_shape: (inputShapes, _params) => {
-    if (inputShapes.length !== 1) {
-      return {
-        shape: null,
-        error: `Layer expects exactly 1 input, but received ${inputShapes.length} inputs`
-      }
-    }
-    return { shape: inputShapes[0] }
-  },
-
-  // Enhanced Merge layer computation
-  merge_layer: (inputShapes, params) => {
-    if (inputShapes.length < 2) {
-      return {
-        shape: null,
-        error: `Merge layer expects at least 2 inputs, but received ${inputShapes.length} inputs`
-      }
-    }
-    
-    const mode = String(params.mode) || 'concatenate'
-    
-    if (mode === 'concatenate') {
-      const firstShape = inputShapes[0]
-      const axis = Number(params.axis) || -1
-      const actualAxis = axis < 0 ? firstShape.length + axis : axis
-      
-      // Validate axis
-      if (actualAxis < 0 || actualAxis >= firstShape.length) {
-        return {
-          shape: null,
-          error: `Invalid concatenation axis ${axis} for shapes with ${firstShape.length} dimensions`
-        }
-      }
-      
-      // Check that all shapes are compatible
-      for (let i = 1; i < inputShapes.length; i++) {
-        const shape = inputShapes[i]
-        if (shape.length !== firstShape.length) {
-          return {
-            shape: null,
-            error: `Cannot concatenate shapes with different dimensionalities: ${JSON.stringify(firstShape)} and ${JSON.stringify(shape)}`
-          }
-        }
-        
-        for (let j = 0; j < shape.length; j++) {
-          if (j !== actualAxis && shape[j] !== firstShape[j]) {
-            return {
-              shape: null,
-              error: `Cannot concatenate shapes ${JSON.stringify(firstShape)} and ${JSON.stringify(shape)} - dimensions must match except at concatenation axis ${actualAxis}`
-            }
+        // For add/multiply/average/maximum, all shapes must be identical
+        for (let i = 1; i < inputShapes.length; i++) {
+          const currentShape = inputShapes[i]
+          if (currentShape.length !== firstShape.length || 
+              !currentShape.every((dim, idx) => dim === firstShape[idx])) {
+            return `Merge (${mode}) requires all inputs to have identical shapes. Input 1: ${JSON.stringify(firstShape)}, Input ${i + 1}: ${JSON.stringify(currentShape)}.`
           }
         }
       }
-      
-      // Calculate concatenated size
-      const result = [...firstShape]
-      result[actualAxis] = inputShapes.reduce((sum, shape) => sum + shape[actualAxis], 0)
-      return { shape: result }
-    } else {
-      // For add, multiply, average, maximum - all shapes must be identical
-      const firstShape = inputShapes[0]
-      
-      for (let i = 1; i < inputShapes.length; i++) {
-        const shape = inputShapes[i]
-        if (shape.length !== firstShape.length) {
-          return {
-            shape: null,
-            error: `Cannot ${mode} shapes with different dimensionalities: ${JSON.stringify(firstShape)} and ${JSON.stringify(shape)}`
-          }
-        }
-        
-        for (let j = 0; j < shape.length; j++) {
-          if (shape[j] !== firstShape[j]) {
-            return {
-              shape: null,
-              error: `Cannot ${mode} shapes ${JSON.stringify(firstShape)} and ${JSON.stringify(shape)} - all dimensions must match exactly`
-            }
-          }
-        }
-      }
-      
-      return { shape: firstShape }
+      break
     }
   }
+  
+  // Avoid unused parameter warnings
+  if (params) {
+    // These parameters are available for future error logic
+  }
+  
+  return undefined
 }
 
 /**
- * Parse shape string like "(28, 28, 3)" into number array [28, 28, 3]
+ * Enhanced shape computation registry with detailed error messages
  */
-function parseShapeString(shapeStr: string): number[] | null {
-  try {
-    // Remove parentheses and split by comma
-    const cleaned = shapeStr.replace(/[()]/g, '').trim()
-    if (!cleaned) return []
-    
-    return cleaned.split(',').map(s => {
-      const num = parseInt(s.trim())
-      if (isNaN(num)) throw new Error(`Invalid dimension: ${s}`)
-      return num
-    })
-  } catch {
-    return null
-  }
+export const enhancedShapeComputationRegistry: Record<string, EnhancedShapeComputeFunction> = {}
+
+// Enhance all basic shape computation functions
+for (const [layerType, basicFunction] of Object.entries(shapeComputationRegistry)) {
+  enhancedShapeComputationRegistry[layerType] = enhanceShapeComputation(basicFunction, layerType)
 }
 
 /**
- * Parse kernel size string like "(3,3)" into [3, 3]
- */
-function parseKernelSize(sizeStr: string): [number, number] | null {
-  try {
-    const cleaned = sizeStr.replace(/[()]/g, '').trim()
-    const parts = cleaned.split(',').map(s => parseInt(s.trim()))
-    
-    if (parts.length === 2 && !parts.some(isNaN)) {
-      return [parts[0], parts[1]]
-    }
-    
-    // Handle single number case like "3" -> [3, 3]
-    if (parts.length === 1 && !isNaN(parts[0])) {
-      return [parts[0], parts[0]]
-    }
-  } catch {
-    // ignore
-  }
-  return null
-}
-
-/**
- * Get enhanced shape computation function by name
+ * Get an enhanced shape computation function by name
  */
 export function getEnhancedShapeComputationFunction(shapeComputationName: string): EnhancedShapeComputeFunction | null {
   return enhancedShapeComputationRegistry[shapeComputationName] || null
 }
 
 /**
- * Compute layer output shape using enhanced validation
+ * Compute shape with enhanced error messages
  */
-export function computeEnhancedLayerShape(
-  layerType: string,
+export function computeShapeEnhanced(
+  shapeComputationName: string,
   inputShapes: number[][],
-  params: LayerParams,
-  shapeComputationName?: string
+  params: LayerParams
 ): ShapeComputationResult {
-  // Get shape computation function name
-  const computationName = shapeComputationName || getDefaultShapeComputation(layerType)
-  
-  if (!computationName) {
-    return { 
-      shape: null, 
-      error: `No shape computation defined for layer type: ${layerType}` 
-    }
-  }
-  
-  const computeFunction = getEnhancedShapeComputationFunction(computationName)
+  const computeFunction = getEnhancedShapeComputationFunction(shapeComputationName)
   
   if (!computeFunction) {
-    return { 
-      shape: null, 
-      error: `Enhanced shape computation function '${computationName}' not found` 
+    return {
+      shape: null,
+      error: `Unknown shape computation function: ${shapeComputationName}`
     }
   }
   
-  try {
-    return computeFunction(inputShapes, params)
-  } catch (error) {
-    return { 
-      shape: null, 
-      error: `Shape computation failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
-    }
-  }
-}
-
-/**
- * Default mapping for layers without explicit shape computation in YAML
- */
-function getDefaultShapeComputation(layerType: string): string | null {
-  const defaults: Record<string, string> = {
-    'Input': 'input_layer',
-    'Dense': 'dense_layer',
-    'Output': 'dense_layer',
-    'Conv2D': 'conv2d_layer',
-    'Conv2DTranspose': 'conv2d_transpose_layer',
-    'MaxPool2D': 'maxpool2d_layer',
-    'Flatten': 'flatten_layer',
-    'UpSampling2D': 'upsampling2d_layer',
-    'GlobalAvgPool': 'global_avg_pool_layer',
-    'Embedding': 'embedding_layer',
-    'LSTM': 'lstm_layer',
-    'GRU': 'gru_layer',
-    'Merge': 'merge_layer',
-    'BatchNorm': 'preserve_shape',
-    'BatchNormalization': 'preserve_shape',
-    'Activation': 'preserve_shape',
-    'Dropout': 'preserve_shape'
-  }
-  
-  return defaults[layerType] || null
+  return computeFunction(inputShapes, params)
 }
