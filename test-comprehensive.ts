@@ -8,11 +8,23 @@ import { generateKerasCode, generateFunctionalKerasCode } from './src/lib/code-g
 import { loadLayersFromYAML } from './src/lib/yaml-layer-loader'
 import { layerDefs } from './src/lib/layer-defs'
 import type { LayerObject, DAGResult } from './src/lib/dag-parser'
+import * as yamlLoader from './src/lib/yaml-layer-loader'
+
+// Global variable to cache YAML content (simulating the browser cache)
+let cachedYamlContent: string | null = null
 
 // Load YAML layers first
 async function initializeLayers() {
-  const yamlPath = join(process.cwd(), 'public', 'layers.yaml')
+  const yamlPath = join(process.cwd(), 'public', 'layers-enhanced.yaml')
   const yamlContent = readFileSync(yamlPath, 'utf-8')
+  
+  // Cache the content for the YAML shape loader
+  cachedYamlContent = yamlContent
+  
+  // Mock the getCachedYamlContent function for testing
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(yamlLoader as any).getCachedYamlContent = () => cachedYamlContent
+  
   const loadedDefs = await loadLayersFromYAML(yamlContent)
   Object.assign(layerDefs, loadedDefs)
 }
@@ -67,6 +79,7 @@ async function runComprehensiveTest() {
   
   const functionalDAG: DAGResult = {
     isValid: true,
+    errors: [],
     orderedNodes: [
       {
         id: 'input1',
@@ -77,13 +90,13 @@ async function runComprehensiveTest() {
       {
         id: 'conv1',
         type: 'Conv2D',
-        params: { filters: 32, kernel_size: 3, activation: 'relu' },
+        params: { filters: 32, kernel_size: '(3,3)', strides: '(1,1)', padding: 'same' },
         varName: 'conv_1'
       },
       {
         id: 'pool1',
         type: 'MaxPooling2D',
-        params: { pool_size: 2 },
+        params: { pool_size: '(2,2)', padding: 'valid' },
         varName: 'pool_1'
       },
       {
@@ -114,7 +127,7 @@ async function runComprehensiveTest() {
     ])
   }
 
-  const functionalCode = generateFunctionalKerasCode(functionalDAG)
+  const functionalCode = await generateFunctionalKerasCode(functionalDAG)
   console.log(functionalCode)
   
   console.log('\n✅ All formatting tests completed successfully!')

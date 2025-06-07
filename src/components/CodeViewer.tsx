@@ -185,24 +185,29 @@ export function CodeViewer({ className = "" }: CodeViewerProps) {
 
   // Auto-generate code when graph changes
   useEffect(() => {
-    const dagResult = parseGraphToDAG(nodes, edges);
+    const generateCode = async () => {
+      const dagResult = parseGraphToDAG(nodes, edges);
 
-    if (!dagResult.isValid) {
-      setGeneratedCode(
-        `# Error: Invalid network structure\n# ${dagResult.errors.join("\n# ")}`
-      );
-      return;
-    }
+      if (!dagResult.isValid) {
+        setGeneratedCode(
+          `# Error: Invalid network structure\n# ${dagResult.errors.join("\n# ")}`
+        );
+        return;
+      }
 
-    const shouldUseFunctional = checkIfFunctionalAPINeeded(dagResult);
+      const shouldUseFunctional = checkIfFunctionalAPINeeded(dagResult);
 
-    if (shouldUseFunctional) {
-      setCodeType("functional");
-      setGeneratedCode(generateFunctionalKerasCode(dagResult));
-    } else {
-      setCodeType("sequential");
-      setGeneratedCode(generateKerasCode(dagResult.orderedNodes));
-    }
+      if (shouldUseFunctional) {
+        setCodeType("functional");
+        const functionalCode = await generateFunctionalKerasCode(dagResult);
+        setGeneratedCode(functionalCode);
+      } else {
+        setCodeType("sequential");
+        setGeneratedCode(generateKerasCode(dagResult.orderedNodes));
+      }
+    };
+    
+    generateCode();
   }, [nodes, edges]);
 
   const handleCopyCode = useCallback(async () => {

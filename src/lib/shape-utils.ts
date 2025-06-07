@@ -11,7 +11,7 @@ import type { Node, Edge } from '@xyflow/react'
  * Computes shapes for all nodes in a React Flow graph and returns shape information
  * along with any errors encountered during computation.
  */
-export function computeNetworkShapes(nodes: Node[], edges: Edge[], inputShape: string) {
+export async function computeNetworkShapes(nodes: Node[], edges: Edge[], inputShape: string) {
   // Parse the graph into a DAG
   const dagResult = parseGraphToDAG(nodes, edges)
   
@@ -24,7 +24,7 @@ export function computeNetworkShapes(nodes: Node[], edges: Edge[], inputShape: s
   }
   
   // Compute shapes for each node
-  const shapeResult = computeShapes(dagResult, inputShape)
+  const shapeResult = await computeShapes(dagResult, inputShape)
   
   // Create a map of node IDs to their computed output shapes as formatted strings
   const nodeShapes = new Map<string, string>()

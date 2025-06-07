@@ -11,7 +11,7 @@ import type { DAGResult } from './src/lib/dag-parser'
 
 // Load YAML layers first
 async function initializeLayers() {
-  const yamlPath = join(process.cwd(), 'public', 'layers.yaml')
+  const yamlPath = join(process.cwd(), 'public', 'layers-enhanced.yaml')
   const yamlContent = readFileSync(yamlPath, 'utf-8')
   const loadedDefs = await loadLayersFromYAML(yamlContent)
   
@@ -60,7 +60,7 @@ async function runTest() {
 
   console.log('Generated Functional API Keras Code:')
   console.log('=' .repeat(50))
-  const generatedCode = generateFunctionalKerasCode(testDAG)
+  const generatedCode = await generateFunctionalKerasCode(testDAG)
   console.log(generatedCode)
   console.log('=' .repeat(50))
 }

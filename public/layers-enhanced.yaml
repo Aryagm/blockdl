@@ -138,7 +138,7 @@ layers:
         default: "image_grayscale"
         options:
           - value: "image_grayscale"
-            label: "Grayscale Image (H×W×1)"
+            label: "  Grayscale Image (H×W×1)"
             description: "Single channel images like MNIST"
           - value: "image_color"
             label: "Color Image (H×W×3)"
@@ -614,7 +614,7 @@ layers:
     frameworks:
       keras:
         import: "Conv2D"
-        template: "Conv2D({{filters}}, kernel_size={{kernel_size}}, strides={{strides}}, padding='''{{padding}}''')"
+        template: "Conv2D({{filters}}, kernel_size={{kernel_size}}, strides={{strides}}, padding='{{padding}}')"
         shape_computation: "conv2d_layer"
         dependencies: ["tensorflow"]
 
@@ -1461,7 +1461,16 @@ layers:
       category: "merge"
       icon: "🔀"
       description: "Merges a list of inputs using a specified mode (e.g., concatenate, add)."
-      tags: ["merge", "concatenate", "add", "multiply", "average", "maximum", "functional_api"]
+      tags:
+        [
+          "merge",
+          "concatenate",
+          "add",
+          "multiply",
+          "average",
+          "maximum",
+          "functional_api",
+        ]
       info: "/docs/general-info.md"
       version: "2.0.0"
       performance:
@@ -1523,13 +1532,7 @@ layers:
     frameworks:
       keras:
         import: "Concatenate, Add, Multiply, Average, Maximum"
-        template: |
-          {% raw %}{% if mode == "concatenate" %}Concatenate({% if axis is defined and axis != -1 and axis != null %}axis={{axis}}{% endif %})
-          {% elif mode == "add" %}Add()
-          {% elif mode == "multiply" %}Multiply()
-          {% elif mode == "average" %}Average()
-          {% elif mode == "maximum" %}Maximum()
-          {% endif %}{% endraw %}
+        template: "{% if mode == 'concatenate' %}Concatenate(){% endif %}{% if mode == 'add' %}Add(){% endif %}{% if mode == 'multiply' %}Multiply(){% endif %}{% if mode == 'average' %}Average(){% endif %}{% if mode == 'maximum' %}Maximum(){% endif %}"
         shape_computation: "merge_layer"
         dependencies: ["tensorflow"]
         version_constraints:
@@ -1566,3 +1569,97 @@ global_validators:
   tuple_pattern: "^\\([0-9, ]+\\)$"
   positive_integer: "^[1-9][0-9]*$"
   probability: "^(0(\\.[0-9]+)?|1(\\.0+)?)$"
+
+# Enhanced Shape Computation System
+# This section defines enhanced validation and error messaging for shape computation
+enhanced_shape_computation:
+  dense_layer:
+    shape_computation: "dense_layer"
+    shape_validation:
+      type: "enhanced"
+      rules:
+        - condition: "input_dims > 2"
+          warning: "Dense layer receiving {input_dims}D input ({input_shape}) will be automatically flattened. Consider adding explicit Flatten layer before Dense for clarity."
+        - condition: "input_dims === 1 && input_shape[0] > 10000"
+          warning: "Large input size ({input_shape[0]}) may cause memory issues. Consider using dimensionality reduction."
+        - condition: "units > 4096"
+          warning: "Very large Dense layer ({units} units) may be slow to train and prone to overfitting."
+      error_messages:
+        invalid_input: "Dense layer requires at least 1D input, got invalid shape: {input_shape}"
+        invalid_units: "Dense layer units must be a positive integer, got: {units}"
+
+  conv2d_layer:
+    shape_computation: "conv2d_layer"
+    shape_validation:
+      type: "enhanced"
+      rules:
+        - condition: "input_dims !== 3"
+          error: "Conv2D requires 3D input (height, width, channels), got {input_dims}D input: {input_shape}. Add reshape or use Dense layer for 1D/2D inputs."
+        - condition: "input_shape[0] < kernel_size[0] || input_shape[1] < kernel_size[1]"
+          error: "Input size ({input_shape[0]}x{input_shape[1]}) is smaller than kernel size ({kernel_size[0]}x{kernel_size[1]}). Reduce kernel size or use padding."
+        - condition: "filters < 1"
+          error: "Conv2D filters must be positive, got: {filters}"
+      error_messages:
+        invalid_kernel: "Invalid kernel size format: {kernel_size}. Use format like '(3,3)'"
+        invalid_strides: "Invalid strides format: {strides}. Use format like '(1,1)'"
+
+  maxpool2d_layer:
+    shape_computation: "maxpool2d_layer"
+    shape_validation:
+      type: "enhanced"
+      rules:
+        - condition: "input_dims !== 3"
+          error: "MaxPool2D requires 3D input (height, width, channels), got {input_dims}D input: {input_shape}"
+        - condition: "input_shape[0] < pool_size[0] || input_shape[1] < pool_size[1]"
+          error: "Input size ({input_shape[0]}x{input_shape[1]}) is smaller than pool size ({pool_size[0]}x{pool_size[1]})"
+      error_messages:
+        invalid_pool_size: "Invalid pool size format: {pool_size}. Use format like '(2,2)'"
+
+  flatten_layer:
+    shape_computation: "flatten_layer"
+    shape_validation:
+      type: "enhanced"
+      rules:
+        - condition: "input_dims < 2"
+          warning: "Flattening 1D input has no effect"
+        - condition: "total_elements > 100000"
+          warning: "Flattening large tensor ({total_elements} elements) may cause memory issues"
+
+  lstm_layer:
+    shape_computation: "lstm_layer"
+    shape_validation:
+      type: "enhanced"
+      rules:
+        - condition: "input_dims !== 3"
+          error: "LSTM requires 3D input (batch, timesteps, features), got {input_dims}D input: {input_shape}"
+        - condition: "units < 1"
+          error: "LSTM units must be positive, got: {units}"
+
+  embedding_layer:
+    shape_computation: "embedding_layer"
+    shape_validation:
+      type: "enhanced"
+      rules:
+        - condition: "input_dims > 2"
+          error: "Embedding layer accepts 1D or 2D input, got {input_dims}D input: {input_shape}"
+        - condition: "output_dim < 1"
+          error: "Embedding output_dim must be positive, got: {output_dim}"
+
+# Enhanced error message templates
+enhanced_error_templates:
+  shape_mismatch: "Shape mismatch in {layer_type}: expected {expected_shape}, got {actual_shape}"
+  dimension_error: "Dimension error in {layer_type}: expected {expected_dims}D input, got {actual_dims}D"
+  parameter_error: "Parameter error in {layer_type}: {parameter} = {value} is invalid. {suggestion}"
+  memory_warning: "Memory warning in {layer_type}: {reason}. Consider {suggestion}"
+  compatibility_error: "Compatibility error: {layer_type} cannot connect to {previous_layer_type} with shape {previous_shape}"
+
+# Enhanced validation settings
+enhanced_validation_settings:
+  strict_mode: true
+  show_warnings: true
+  show_suggestions: true
+  max_error_details: 3
+  warning_thresholds:
+    large_tensor_elements: 100000
+    large_dense_units: 4096
+    deep_network_layers: 50

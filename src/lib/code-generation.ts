@@ -97,7 +97,7 @@ export function generateKerasCode(layers: LayerObject[]): string {
 /**
  * Generates Keras Functional API code for complex DAG structures
  */
-export function generateFunctionalKerasCode(dagResult: DAGResult): string {
+export async function generateFunctionalKerasCode(dagResult: DAGResult): Promise<string> {
   if (!dagResult.isValid || dagResult.orderedNodes.length === 0) {
     return '# Invalid DAG structure - cannot generate code'
   }
@@ -120,12 +120,12 @@ export function generateFunctionalKerasCode(dagResult: DAGResult): string {
   const layerVariables = new Map<string, string>()
 
   // Generate layer definitions
-  orderedNodes.forEach((layer) => {
+  for (const layer of orderedNodes) {
     const { id, type, params, varName } = layer
     
     if (type === 'Input') {
       // Handle input layers - compute shape from inputType and dimensions
-      const shape = computeInputShape(params)
+      const shape = await computeInputShape(params)
       codeLines.push(`${varName} = Input(shape=${shape})`)
       layerVariables.set(id, varName)
     } else {
@@ -239,7 +239,7 @@ export function generateFunctionalKerasCode(dagResult: DAGResult): string {
         layerVariables.set(id, varName)
       }
     }
-  })
+  }
 
   // Find output nodes
   const outputVars: string[] = []

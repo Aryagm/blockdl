@@ -2,46 +2,31 @@
  * Input layer utilities for handling different input types and computing shapes
  */
 
+import { computeYAMLDrivenShape } from './yaml-shape-loader'
+import type { LayerParams } from './layer-defs'
+
 export interface InputShapeResult {
   shape: string
   dimensions: number[]
 }
 
 /**
- * Computes shape string from input layer parameters
+ * Computes shape string from input layer parameters using YAML-driven computation
  */
-export function computeInputShape(params: Record<string, any>): string {
-  if (params.inputType) {
-    // New input layer structure - compute shape from input type
-    const inputType = params.inputType;
-    switch (inputType) {
-      case 'image_grayscale':
-        const h1 = params.height || 28;
-        const w1 = params.width || 28;
-        return `(${h1}, ${w1}, 1)`;
-      case 'image_color':
-        const h2 = params.height || 28;
-        const w2 = params.width || 28;
-        return `(${h2}, ${w2}, 3)`;
-      case 'image_custom':
-        const h3 = params.height || 28;
-        const w3 = params.width || 28;
-        const c3 = params.channels || 1;
-        return `(${h3}, ${w3}, ${c3})`;
-      case 'flat_data':
-        const size = params.flatSize || 784;
-        return `(${size},)`;
-      case 'sequence':
-        const seqLen = params.seqLength || 100;
-        const features = params.features || 128;
-        return `(${seqLen}, ${features})`;
-      case 'custom':
-        return params.customShape || '(784,)';
-      default:
-        return '(784,)';
+export async function computeInputShape(params: Record<string, unknown>): Promise<string> {
+  try {
+    // Use YAML-driven shape computation for Input layer
+    const shapeResult = await computeYAMLDrivenShape('Input', [], params as LayerParams)
+    if (shapeResult.shape) {
+      // Convert shape array to string format
+      return `(${shapeResult.shape.join(', ')})`
     }
-  } else if (params.shape) {
-    // Legacy input layer with shape parameter
+  } catch (error) {
+    console.warn('YAML-driven shape computation failed, using fallback:', error)
+  }
+  
+  // Fallback to legacy behavior if YAML computation fails
+  if (params.shape && typeof params.shape === 'string') {
     return params.shape;
   }
   
@@ -49,44 +34,22 @@ export function computeInputShape(params: Record<string, any>): string {
 }
 
 /**
- * Gets display shape for input layers in the UI
+ * Gets display shape for input layers in the UI using YAML-driven computation
  */
-export function getInputDisplayShape(params: Record<string, any>): string {
-  const inputType = params.inputType || 'image_grayscale';
-  
-  switch (inputType) {
-    case 'image_grayscale': {
-      const h1 = params.height || 28;
-      const w1 = params.width || 28;
-      return `${h1}×${w1}×1`;
+export async function getInputDisplayShape(params: Record<string, unknown>): Promise<string> {
+  try {
+    // Use YAML-driven shape computation for Input layer
+    const shapeResult = await computeYAMLDrivenShape('Input', [], params as LayerParams)
+    if (shapeResult.shape) {
+      // Convert shape array to display format using × separator
+      return shapeResult.shape.join('×')
     }
-    case 'image_color': {
-      const h2 = params.height || 28;
-      const w2 = params.width || 28;
-      return `${h2}×${w2}×3`;
-    }
-    case 'image_custom': {
-      const h3 = params.height || 28;
-      const w3 = params.width || 28;
-      const c3 = params.channels || 1;
-      return `${h3}×${w3}×${c3}`;
-    }
-    case 'flat_data': {
-      const size = params.flatSize || 784;
-      return `${size}`;
-    }
-    case 'sequence': {
-      const seqLen = params.seqLength || 100;
-      const features = params.features || 128;
-      return `${seqLen}×${features}`;
-    }
-    case 'custom': {
-      return params.customShape || '784';
-    }
-    default: {
-      return '28×28×1';
-    }
+  } catch (error) {
+    console.warn('YAML-driven shape computation failed for display, using fallback:', error)
   }
+  
+  // Fallback to default if YAML computation fails
+  return '28×28×1'
 }
 
 /**

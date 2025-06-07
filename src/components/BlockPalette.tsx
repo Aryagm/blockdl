@@ -38,6 +38,8 @@ export default function BlockPalette({ className = "" }: BlockPaletteProps = {})
     const types = getLayerTypes()
     const categories = getLayerCategoriesFromYAML()
     
+    console.log(`🔄 BlockPalette updateData: ${types.length} types, ${categories.length} categories`)
+    
     setLayerTypes(types)
     setLayerCategories(categories)
   }, [])
@@ -56,15 +58,17 @@ export default function BlockPalette({ className = "" }: BlockPaletteProps = {})
     // Poll until data loads (YAML loading is async)
     const interval = setInterval(() => {
       const currentTypes = getLayerTypes()
+      const currentCategories = getLayerCategoriesFromYAML()
       
-      if (currentTypes.length > 0 && currentTypes.length !== layerTypes.length) {
+      if (currentTypes.length > 0 && currentCategories.length > 0 && 
+          (currentTypes.length !== layerTypes.length || currentCategories.length !== layerCategories.length)) {
         updateData()
         clearInterval(interval)
       }
     }, CONFIG.POLLING_INTERVAL)
 
     return () => clearInterval(interval)
-  }, [layerTypes.length, updateData])
+  }, [layerTypes.length, layerCategories.length, updateData])
 
   const filteredCategories = layerCategories
     .map((category) => {
@@ -108,6 +112,11 @@ export default function BlockPalette({ className = "" }: BlockPaletteProps = {})
         <div className="text-center py-8 text-slate-500">
           <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
           <p>No blocks found matching "{searchTerm}"</p>
+        </div>
+      ) : filteredCategories.length === 0 ? (
+        <div className="text-center py-8 text-slate-500">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-400 mx-auto mb-2"></div>
+          <p>Loading blocks...</p>
         </div>
       ) : (
         filteredCategories.map((category) => (

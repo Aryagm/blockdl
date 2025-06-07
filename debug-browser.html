@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>YAML Loading Debug</title>
+</head>
+<body>
+    <h1>YAML Loading Debug</h1>
+    <div id="results"></div>
+    <script type="module">
+        const resultsDiv = document.getElementById('results');
+        
+        function log(message) {
+            console.log(message);
+            resultsDiv.innerHTML += `<p>${message}</p>`;
+        }
+        
+        async function testYamlLoading() {
+            try {
+                log('🔍 Testing YAML loading in browser...');
+                
+                const response = await fetch('/layers-enhanced.yaml');
+                log(`📡 Response status: ${response.status}`);
+                
+                if (response.ok) {
+                    const yamlContent = await response.text();
+                    log(`✅ Fetched YAML content size: ${yamlContent.length} characters`);
+                    log(`🔍 First 200 characters: ${yamlContent.substring(0, 200)}`);
+                    
+                    // Test if we can import the YAML loader
+                    try {
+                        const { initializeLayerDefs, getCachedYamlContent } = await import('./src/lib/yaml-layer-loader.js');
+                        log('✅ Successfully imported YAML loader module');
+                        
+                        await initializeLayerDefs();
+                        log('✅ YAML layer definitions initialized');
+                        
+                        const cachedContent = getCachedYamlContent();
+                        log(`📦 Cached YAML content: ${cachedContent ? 'Available' : 'Not available'}`);
+                        
+                        const { getLayerTypes } = await import('./src/lib/layer-defs.js');
+                        const layerTypes = getLayerTypes();
+                        log(`🎯 Layer types loaded: ${layerTypes.length}`);
+                        layerTypes.forEach(layer => {
+                            log(`  - ${layer.type}: ${layer.description}`);
+                        });
+                        
+                    } catch (importError) {
+                        log(`❌ Error importing modules: ${importError.message}`);
+                    }
+                    
+                } else {
+                    log(`❌ Failed to fetch YAML: ${response.status}`);
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+            }
+        }
+        
+        testYamlLoading();
+    </script>
+</body>
+</html>

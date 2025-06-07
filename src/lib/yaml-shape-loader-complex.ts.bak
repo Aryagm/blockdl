@@ -1,0 +1,120 @@
+/**
+ * YAML-driven shape computation loader
+ * 
+ * This module loads shape computation configurations from YAML and provides
+ * utilities to resolve shape computation functions for layers.
+ */
+
+import { getCachedYamlContent } from './yaml-layer-loader'
+import { validateYAMLConfig } from './yaml-schema'
+import { getShapeComputationFunction } from './shape-computation-registry'
+import type { LayerParams } from './layer-defs'
+
+/**
+ * Cache for YAML-loaded shape computation mappings
+ */
+let cachedShapeComputationMappings: Map<string, string> | null = null
+
+/**
+ * Load shape computation mappings from YAML configuration
+ */
+export async function loadShapeComputationMappings(): Promise<Map<string, string>> {
+  if (cachedShapeComputationMappings) {
+    return cachedShapeComputationMappings
+  }
+
+  try {
+    let yamlContent = getCachedYamlContent()
+    
+    // If YAML content is not cached, try to load it directly from fetch
+    if (!yamlContent) {
+      try {
+        const response = await fetch('/layers-enhanced.yaml')
+        if (!response.ok) {
+          throw new Error(`Failed to fetch layers-enhanced.yaml: ${response.status}`)
+        }
+        yamlContent = await response.text()
+      } catch (fetchError) {
+        console.warn('Could not fetch YAML content, shape computation will be limited:', fetchError)
+        return new Map()
+      }
+    }
+
+    const config = validateYAMLConfig(yamlContent)
+    const mappings = new Map<string, string>()
+
+    // Extract shape computation mappings from layers
+    Object.entries(config.layers).forEach(([layerName, layerDef]) => {
+      const kerasFramework = layerDef.frameworks.keras
+      if (kerasFramework?.shape_computation) {
+        mappings.set(layerName, kerasFramework.shape_computation)
+      }
+    })
+
+    cachedShapeComputationMappings = mappings
+    return mappings
+  } catch (error) {
+    console.error('Failed to load shape computation mappings from YAML:', error)
+    return new Map()
+  }
+}
+
+/**
+ * Get shape computation function name for a layer type from YAML
+ */
+export async function getLayerShapeComputation(layerType: string): Promise<string | null> {
+  try {
+    const mappings = await loadShapeComputationMappings()
+    return mappings.get(layerType) || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Compute layer output shape using YAML-driven configuration
+ */
+export async function computeYAMLDrivenShape(
+  layerType: string,
+  inputShapes: number[][],
+  params: LayerParams
+): Promise<{ shape: number[] | null; error?: string }> {
+  try {
+    // Get shape computation function name from YAML
+    const shapeComputationName = await getLayerShapeComputation(layerType)
+    
+    if (!shapeComputationName) {
+      return {
+        shape: null,
+        error: `No shape computation configuration found for layer type: ${layerType}`
+      }
+    }
+
+    // Get the actual computation function
+    const computeFunction = getShapeComputationFunction(shapeComputationName)
+    
+    if (!computeFunction) {
+      return {
+        shape: null,
+        error: `Shape computation function '${shapeComputationName}' not implemented`
+      }
+    }
+
+    // Compute the shape
+    const shape = computeFunction(inputShapes, params)
+    return { shape }
+    
+  } catch (error) {
+    return {
+      shape: null,
+      error: `YAML-driven shape computation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    }
+  }
+}
+
+/**
+ * Clear cached shape computation mappings (for testing/reloading)
+ */
+export function clearShapeComputationCache(): void {
+  cachedShapeComputationMappings = null
+}

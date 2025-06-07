@@ -8,6 +8,9 @@ import { loadCategoriesWithLayers, getCachedYamlContent } from './yaml-layer-loa
 // Type for parameter values - matching the YAML loader
 export type LayerParamValue = string | number | boolean
 
+// Type for layer parameters object
+export type LayerParams = Record<string, LayerParamValue>
+
 export interface LayerFormField {
   key: string
   label: string
@@ -23,6 +26,7 @@ export interface LayerDef {
   type: string
   icon: string
   description: string
+  category: string  // Added category field
   defaultParams: Record<string, LayerParamValue>
   formSpec: LayerFormField[]
   codeGen: (params: Record<string, LayerParamValue>) => string
@@ -103,7 +107,7 @@ export function getUsedKerasImports(layerTypes: string[]): string[] {
 export function getLayerCategoriesFromYAML() {
   const yamlContent = getCachedYamlContent()
   if (!yamlContent) {
-    console.warn('YAML content not loaded yet, returning empty categories')
+    // Don't log a warning during initial load - this is expected
     return []
   }
   

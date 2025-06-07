@@ -1,98 +1,61 @@
 /**
- * YAML Layer Configuration Loader
- * Loads layer definitions from YAML configuration files using Zod validation
+ * Enhanced YAML Layer Configuration Loader
+ * Loads layer definitions from the enhanced YAML configuration using the new schema
  */
 
 import yaml from 'js-yaml'
-import { z } from 'zod'
 import type { LayerDef, LayerFormField, LayerParamValue } from './layer-defs'
 import { layerDefs } from './layer-defs'
-
-// Zod schemas for YAML structure validation
-const YAMLParameterSchema = z.object({
-  type: z.enum(['number', 'text', 'select']),
-  label: z.string(),
-  default: z.union([z.string(), z.number(), z.boolean()]).optional(),
-  options: z.array(z.object({
-    value: z.string(),
-    label: z.string()
-  })).optional(),
-  validation: z.object({
-    min: z.number().optional(),
-    max: z.number().optional(),
-    step: z.number().optional(),
-    required: z.boolean().optional()
-  }).optional(),
-  show_when: z.record(z.array(z.string())).optional(),
-  help: z.string().optional()
-})
-
-const YAMLLayerSchema = z.object({
-  metadata: z.object({
-    category: z.string(),
-    icon: z.string(),
-    description: z.string(),
-    tags: z.array(z.string()),
-    documentation: z.string().optional()
-  }),
-  visual: z.object({
-    handles: z.object({
-      input: z.boolean(),
-      output: z.boolean()
-    }),
-    default_size: z.tuple([z.number(), z.number()]).optional()
-  }),
-  parameters: z.record(YAMLParameterSchema),
-  features: z.object({
-    supports_multiplier: z.boolean().optional()
-  }).optional(),
-  keras: z.object({
-    import: z.string(),
-    code_template: z.string(),
-    shape_computation: z.string()
-  })
-})
-
-const YAMLLayerConfigSchema = z.object({
-  metadata: z.object({
-    version: z.string(),
-    description: z.string(),
-    framework: z.string(),
-    created: z.string()
-  }),
-  categories: z.record(z.object({
-    name: z.string(),
-    color: z.string(),
-    bg_color: z.string(),
-    border_color: z.string(),
-    text_color: z.string(),
-    description: z.string()
-  })),
-  layers: z.record(YAMLLayerSchema)
-})
-
-type YAMLLayer = z.infer<typeof YAMLLayerSchema>
-type YAMLParameter = z.infer<typeof YAMLParameterSchema>
+import { 
+  validateYAMLConfig,
+  type EnhancedLayer,
+  type ParameterDefinition 
+} from './yaml-schema'
 
 /**
- * Convert YAML parameter to LayerFormField format
+ * Convert enhanced YAML parameter to LayerFormField format
  */
-function convertParameter(key: string, param: YAMLParameter): LayerFormField {
+function convertParameter(key: string, param: ParameterDefinition): LayerFormField {
+  // Map enhanced YAML parameter types to LayerFormField types
+  const typeMapping: Record<string, 'number' | 'text' | 'select'> = {
+    'number': 'number',
+    'text': 'text',
+    'select': 'select',
+    'boolean': 'select', // Convert boolean to select with true/false options
+    'color': 'text',     // Convert color to text input
+    'range': 'number'    // Convert range to number input
+  }
+
+  const mappedType = typeMapping[param.type] || 'text'
+  
   const field: LayerFormField = {
     key,
     label: param.label,
-    type: param.type,
-    ...(param.options && { options: param.options }),
+    type: mappedType,
     ...(param.validation?.min !== undefined && { min: param.validation.min }),
     ...(param.validation?.max !== undefined && { max: param.validation.max }),
     ...(param.validation?.step !== undefined && { step: param.validation.step })
   }
 
+  // Handle options - either from original options or convert boolean to select
+  if (param.options && param.options.length > 0) {
+    field.options = param.options
+  } else if (param.type === 'boolean') {
+    field.options = [
+      { value: 'true', label: 'True' },
+      { value: 'false', label: 'False' }
+    ]
+  }
+
   // Convert show_when conditions to show function
-  if (param.show_when) {
+  if (param.conditional?.show_when) {
     field.show = (params: Record<string, LayerParamValue>) => {
-      return Object.entries(param.show_when!).some(([paramKey, values]) => {
-        return values.includes(String(params[paramKey]))
+      return Object.entries(param.conditional!.show_when!).some(([paramKey, values]) => {
+        if (Array.isArray(values)) {
+          return values.includes(String(params[paramKey]))
+        }
+        // Handle complex conditional logic here if needed
+        return false
       })
     }
   }
@@ -174,14 +137,57 @@ const TemplateProcessor = {
   },
 
   processConditionals(code: string, params: Record<string, LayerParamValue>): string {
-    // Handle Jinja2-like conditional statements for Merge layer
-    return code.replace(
-      /\{%\s*if\s+mode\s*==\s*["'](\w+)["']\s*%\}([^{]+)\{%\s*endif\s*%\}/g,
+    // Handle all Jinja2-like conditional statements
+    let result = code.trim()
+    
+    // Handle "is not none" checks first (most specific)
+    result = result.replace(
+      /\{%\s*if\s+(\w+)\s+is\s+not\s+none\s*%\}((?:(?!\{%\s*endif\s*%\}).)*)?\{%\s*endif\s*%\}/g,
+      (_, varName, content) => {
+        const value = params[varName]
+        return value !== null && value !== undefined && value !== '' ? content.trim() : ''
+      }
+    )
+    
+    // Handle "is defined" checks
+    result = result.replace(
+      /\{%\s*if\s+(\w+)\s+is\s+defined\s*%\}((?:(?!\{%\s*endif\s*%\}).)*)?\{%\s*endif\s*%\}/g,
+      (_, varName, content) => {
+        const value = params[varName]
+        return value !== undefined ? content.trim() : ''
+      }
+    )
+    
+    // Handle specific conditional patterns with mode comparisons
+    result = result.replace(
+      /\{%\s*if\s+mode\s*==\s*["'](\w+)["']\s*%\}((?:(?!\{%\s*endif\s*%\}).)*)?\{%\s*endif\s*%\}/g,
       (_, conditionMode, content) => {
         const mode = params.mode || 'concat'
         return mode === conditionMode ? content.trim() : ''
       }
-    ).split('\n').filter(line => line.trim() !== '').join('\n').trim()
+    )
+    
+    // Handle elif chain patterns by processing them sequentially
+    result = result.replace(
+      /\{%\s*if\s+mode\s*==\s*["'](\w+)["']\s*%\}((?:(?!\{%\s*elif)(?!\{%\s*endif\s*%\}).)*)?\{%\s*elif\s+mode\s*==\s*["'](\w+)["']\s*%\}((?:(?!\{%\s*endif\s*%\}).)*)?\{%\s*endif\s*%\}/g,
+      (_, mode1, content1, mode2, content2) => {
+        const mode = params.mode || 'concat'
+        if (mode === mode1) return content1.trim()
+        if (mode === mode2) return content2.trim()
+        return ''
+      }
+    )
+    
+    // Handle variable existence checks like {% if noise_shape %} (least specific, comes last)
+    result = result.replace(
+      /\{%\s*if\s+(\w+)\s*%\}((?:(?!\{%\s*endif\s*%\}).)*)?\{%\s*endif\s*%\}/g,
+      (_, varName, content) => {
+        const value = params[varName]
+        return value && value !== '' && value !== null && value !== undefined ? content.trim() : ''
+      }
+    )
+    
+    return result.split('\n').filter(line => line.trim() !== '').join('\n').trim()
   },
 
   processVariables(code: string, params: Record<string, LayerParamValue>): string {
@@ -208,10 +214,10 @@ const TemplateProcessor = {
 }
 
 /**
- * Convert YAML layer to LayerDef format using validated schema
+ * Convert enhanced YAML layer to LayerDef format using validated schema
  */
-function convertYAMLLayer(layerName: string, yamlLayer: YAMLLayer): LayerDef {
-  const { metadata, parameters, keras, features } = yamlLayer
+function convertYAMLLayer(layerName: string, yamlLayer: EnhancedLayer): LayerDef {
+  const { metadata, parameters, frameworks, features } = yamlLayer
   
   // Convert parameters to formSpec and extract defaults
   const formSpec: LayerFormField[] = Object.entries(parameters).map(([key, param]) => 
@@ -224,26 +230,37 @@ function convertYAMLLayer(layerName: string, yamlLayer: YAMLLayer): LayerDef {
       .map(([key, param]) => [key, param.default!])
   )
 
+  // Use Keras framework by default (enhanced YAML uses frameworks structure)
+  const kerasFramework = frameworks.keras
+  if (!kerasFramework) {
+    throw new Error(`Layer ${layerName} missing Keras framework definition`)
+  }
+
   return {
     type: layerName,
     icon: metadata.icon,
     description: metadata.description,
+    category: metadata.category,  // Include category from metadata
     defaultParams,
     formSpec,
     codeGen: (params: Record<string, LayerParamValue>) => 
-      TemplateProcessor.generateCode(keras.code_template, params, layerName),
-    kerasImport: keras.import,
+      TemplateProcessor.generateCode(
+        typeof kerasFramework.template === 'string' ? kerasFramework.template : kerasFramework.template.base, 
+        params, 
+        layerName
+      ),
+    kerasImport: Array.isArray(kerasFramework.import) ? kerasFramework.import[0] : kerasFramework.import,
     supportsMultiplier: features?.supports_multiplier || false
   }
 }
 
 /**
- * Load layer definitions from YAML file with Zod validation
+ * Load layer definitions from enhanced YAML file with validation
  */
 export async function loadLayersFromYAML(yamlContent: string): Promise<Record<string, LayerDef>> {
   try {
     const rawConfig = yaml.load(yamlContent)
-    const config = YAMLLayerConfigSchema.parse(rawConfig)
+    const config = validateYAMLConfig(rawConfig)
     
     return Object.fromEntries(
       Object.entries(config.layers).map(([layerName, yamlLayer]) => [
@@ -252,9 +269,9 @@ export async function loadLayersFromYAML(yamlContent: string): Promise<Record<st
       ])
     )
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      console.error('YAML validation errors:', error.errors)
-      throw new Error(`Invalid YAML configuration: ${error.errors.map(e => e.message).join(', ')}`)
+    if (error instanceof Error) {
+      console.error('YAML validation errors:', error.message)
+      throw new Error(`Invalid YAML configuration: ${error.message}`)
     }
     console.error('Error loading YAML configuration:', error)
     throw error
@@ -265,17 +282,17 @@ export async function loadLayersFromYAML(yamlContent: string): Promise<Record<st
 let cachedYamlContent: string | null = null
 
 /**
- * Load layer categories from YAML with validation
+ * Load layer categories from enhanced YAML with validation
  */
 export function loadCategoriesFromYAML(yamlContent: string) {
   try {
     const rawConfig = yaml.load(yamlContent)
-    const config = YAMLLayerConfigSchema.parse(rawConfig)
+    const config = validateYAMLConfig(rawConfig)
     return config.categories
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      console.error('YAML validation errors:', error.errors)
-      throw new Error(`Invalid YAML configuration: ${error.errors.map(e => e.message).join(', ')}`)
+    if (error instanceof Error) {
+      console.error('YAML validation errors:', error.message)
+      throw new Error(`Invalid YAML configuration: ${error.message}`)
     }
     console.error('Error loading categories from YAML:', error)
     throw error
@@ -288,7 +305,7 @@ export function loadCategoriesFromYAML(yamlContent: string) {
 export function loadCategoriesWithLayers(yamlContent: string) {
   try {
     const rawConfig = yaml.load(yamlContent)
-    const config = YAMLLayerConfigSchema.parse(rawConfig)
+    const config = validateYAMLConfig(rawConfig)
     
     // Create category-layer mapping
     const categoryLayerMap = Object.fromEntries(
@@ -314,9 +331,9 @@ export function loadCategoriesWithLayers(yamlContent: string) {
       layerTypes: categoryLayerMap[categoryKey] || []
     }))
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      console.error('YAML validation errors:', error.errors)
-      throw new Error(`Invalid YAML configuration: ${error.errors.map(e => e.message).join(', ')}`)
+    if (error instanceof Error) {
+      console.error('YAML validation errors:', error.message)
+      throw new Error(`Invalid YAML configuration: ${error.message}`)
     }
     console.error('Error loading categories with layers from YAML:', error)
     throw error
@@ -331,14 +348,14 @@ export function getCachedYamlContent(): string | null {
 }
 
 /**
- * Initialize layer definitions by loading from YAML file and populating layerDefs
+ * Initialize layer definitions by loading from enhanced YAML file and populating layerDefs
  */
 export async function initializeLayerDefs(): Promise<void> {
   try {
-    // Load YAML from public directory
-    const response = await fetch('/layers.yaml')
+    // Load enhanced YAML from public directory
+    const response = await fetch('/layers-enhanced.yaml')
     if (!response.ok) {
-      throw new Error(`Failed to fetch layers.yaml: ${response.status} ${response.statusText}`)
+      throw new Error(`Failed to fetch layers-enhanced.yaml: ${response.status} ${response.statusText}`)
     }
     
     const yamlContent = await response.text()
@@ -349,9 +366,9 @@ export async function initializeLayerDefs(): Promise<void> {
     Object.keys(layerDefs).forEach(key => delete layerDefs[key])
     Object.assign(layerDefs, loadedLayerDefs)
     
-    console.log(`Successfully loaded ${Object.keys(layerDefs).length} layer definitions from YAML`)
+    console.log(`Successfully loaded ${Object.keys(layerDefs).length} layer definitions from enhanced YAML`)
   } catch (error) {
-    console.error('Failed to initialize layer definitions from YAML:', error)
+    console.error('Failed to initialize layer definitions from enhanced YAML:', error)
     throw error
   }
 }

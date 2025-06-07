@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { addEdge, applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
 import type { Node, Edge, NodeChange, EdgeChange, Connection } from '@xyflow/react'
 import { computeNetworkShapes } from './shape-utils'
+import { computeYAMLDrivenShape } from './yaml-shape-loader'
 
 interface LayerParams {
   inputType?: string;
@@ -27,7 +28,7 @@ interface FlowState {
   onEdgesChange: (changes: EdgeChange[]) => void
   onConnect: (connection: Connection) => void
   addNode: (node: Node) => void
-  updateShapeErrors: () => void
+  updateShapeErrors: () => Promise<void>
 }
 
 export const useFlowStore = create<FlowState>((set, get) => ({
@@ -83,7 +84,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     setTimeout(() => get().updateShapeErrors(), 0)
   },
 
-  updateShapeErrors: () => {
+  updateShapeErrors: async () => {
     const { nodes, edges } = get()
     
     try {
@@ -93,58 +94,21 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       
       if (inputNode?.data.params) {
         const params = inputNode.data.params as LayerParams;
-        // Check if it's the new input type structure
-        if (params.inputType) {
-          const inputType = params.inputType;
-          let h = 28;
-          let w = 28;
-          let c = 1;
-          let size = 784;
-          let seqLen = 100;
-          let features = 128;
-
-          switch (inputType) {
-            case 'image_grayscale':
-              h = params.height || 28;
-              w = params.width || 28;
-              inputShape = `(${h}, ${w}, 1)`;
-              break;
-            case 'image_color':
-              h = params.height || 28;
-              w = params.width || 28;
-              inputShape = `(${h}, ${w}, 3)`;
-              break;
-            case 'image_custom':
-              h = params.height || 28;
-              w = params.width || 28;
-              c = params.channels || 1;
-              inputShape = `(${h}, ${w}, ${c})`;
-              break;
-            case 'flat_data':
-              size = params.flatSize || 784;
-              inputShape = `(${size},)`;
-              break;
-            case 'sequence':
-              seqLen = params.seqLength || 100;
-              features = params.features || 128;
-              inputShape = `(${seqLen}, ${features})`;
-              break;
-            case 'custom':
-              inputShape = params.customShape || '(784,)';
-              break;
-            default:
-              inputShape = '(784,)';
-          }
+        // Use YAML-driven shape computation for Input layer
+        const shapeResult = await computeYAMLDrivenShape('Input', [], params)
+        if (shapeResult.shape) {
+          // Convert shape array to string format
+          inputShape = `(${shapeResult.shape.join(', ')})`
         } else if (params.shape) {
-          // Legacy input layer with shape parameter
+          // Legacy fallback
           inputShape = params.shape;
         }
       }
       
-      const { errors } = computeNetworkShapes(nodes, edges, inputShape)
+      const { errors } = await computeNetworkShapes(nodes, edges, inputShape)
       const errorMap = new Map<string, string>()
       
-      errors.forEach(error => {
+      errors.forEach((error: { nodeId: string; message: string }) => {
         errorMap.set(error.nodeId, error.message)
       })
       
