@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@codemirror/lang-python": "^6.2.1",
-    "@hookform/resolvers": "^5.0.1",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-popover": "^1.1.14",
@@ -27,17 +26,11 @@
     "graphlib": "^2.1.8",
     "js-yaml": "^4.1.0",
     "lucide-react": "^0.511.0",
-    "ml-matrix": "^6.12.1",
-    "node-fetch": "^3.3.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-hook-form": "^7.57.0",
     "tailwind-merge": "^3.3.0",
     "tailwindcss": "^4.1.8",
-    "use-undo": "^1.1.1",
-    "yaml": "^2.8.0",
     "zod": "^3.25.51",
-    "zundo": "^2.3.0",
     "zustand": "^5.0.5"
   },
   "devDependencies": {
@@ -50,9 +43,6 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.19.4",
-    "tw-animate-css": "^1.3.2",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.30.1",
     "vite": "^6.3.5"
