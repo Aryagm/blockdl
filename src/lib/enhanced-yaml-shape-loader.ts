@@ -4,21 +4,23 @@
 
 import type { LayerParams } from './layer-defs'
 import { computeEnhancedLayerShape, type ShapeComputationResult } from './enhanced-shape-computation'
+import { getCachedYamlContent } from './yaml-layer-loader'
 
 /**
- * Loads YAML content directly from file
+ * Loads YAML content from cache (loaded once at startup)
  */
-async function loadYAMLContent(): Promise<any> {
+async function loadYAMLContent(): Promise<Record<string, unknown> | null> {
   try {
-    const response = await fetch('/layers-enhanced.yaml')
-    if (!response.ok) {
-      throw new Error(`Failed to fetch YAML: ${response.status}`)
+    const yamlText = getCachedYamlContent()
+    if (!yamlText) {
+      console.error('YAML content not cached. Ensure initializeLayerDefs() was called at startup.')
+      return null
     }
-    const yamlText = await response.text()
+    
     const YAML = await import('yaml')
-    return YAML.parse(yamlText)
+    return YAML.parse(yamlText) as Record<string, unknown>
   } catch (error) {
-    console.error('Failed to load YAML content:', error)
+    console.error('Failed to parse cached YAML content:', error)
     return null
   }
 }
@@ -32,7 +34,7 @@ export async function computeEnhancedYAMLDrivenShape(
   params: LayerParams
 ): Promise<ShapeComputationResult> {
   try {
-    // Load YAML content directly
+    // Load YAML content from cache
     const yamlContent = await loadYAMLContent()
     
     if (!yamlContent || !yamlContent.layers) {
@@ -42,12 +44,15 @@ export async function computeEnhancedYAMLDrivenShape(
       }
     }
 
-    // Get layer definition
-    const layerDef = yamlContent.layers[layerType]
+    // Get layer definition with proper typing
+    const layers = yamlContent.layers as Record<string, Record<string, unknown>>
+    const layerDef = layers[layerType]
     let shapeComputationName: string | undefined
     
-    if (layerDef && layerDef.frameworks?.keras?.shape_computation) {
-      shapeComputationName = layerDef.frameworks.keras.shape_computation
+    if (layerDef) {
+      const frameworks = layerDef.frameworks as Record<string, Record<string, unknown>>
+      const keras = frameworks?.keras as Record<string, unknown>
+      shapeComputationName = keras?.shape_computation as string
     }
 
     // Use enhanced shape computation

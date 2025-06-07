@@ -3,19 +3,7 @@ import { addEdge, applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
 import type { Node, Edge, NodeChange, EdgeChange, Connection } from '@xyflow/react'
 import { computeNetworkShapes } from './shape-utils'
 import { computeYAMLDrivenShape } from './yaml-shape-loader'
-
-interface LayerParams {
-  inputType?: string;
-  height?: number;
-  width?: number;
-  channels?: number;
-  flatSize?: number;
-  seqLength?: number;
-  features?: number;
-  customShape?: string;
-  shape?: string;
-  [key: string]: unknown;
-}
+import type { LayerParams } from './layer-defs'
 
 interface FlowState {
   nodes: Node[]
@@ -100,8 +88,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           // Convert shape array to string format
           inputShape = `(${shapeResult.shape.join(', ')})`
         } else if (params.shape) {
-          // Legacy fallback
-          inputShape = params.shape;
+          // Legacy fallback - convert to string
+          inputShape = String(params.shape);
         }
       }
       

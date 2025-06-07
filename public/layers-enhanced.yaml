@@ -1539,6 +1539,8 @@ layers:
           min: "2.0.0"
     validation:
       input_shapes: [[100, 64], [100, 64]]
+  
+  
 
 # Global template definitions for reuse
 global_templates:

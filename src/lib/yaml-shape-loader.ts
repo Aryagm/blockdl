@@ -1,27 +1,29 @@
 /**
  * Simplified YAML-driven shape computation loader
  * 
- * This module loads shape computation configurations directly from YAML
- * without caching complexity.
+ * This module loads shape computation configurations using cached YAML content
+ * for optimal performance during object moves.
  */
 
 import { computeEnhancedLayerShape, type ShapeComputationResult } from './enhanced-shape-computation'
+import { getCachedYamlContent } from './yaml-layer-loader'
 import type { LayerParams } from './layer-defs'
 
 /**
- * Loads YAML content directly from file
+ * Loads YAML content from cache (loaded once at startup)
  */
 async function loadYAMLContent(): Promise<Record<string, unknown> | null> {
   try {
-    const response = await fetch('/layers-enhanced.yaml')
-    if (!response.ok) {
-      throw new Error(`Failed to fetch YAML: ${response.status}`)
+    const yamlText = getCachedYamlContent()
+    if (!yamlText) {
+      console.error('YAML content not cached. Ensure initializeLayerDefs() was called at startup.')
+      return null
     }
-    const yamlText = await response.text()
+    
     const YAML = await import('yaml')
     return YAML.parse(yamlText)
   } catch (error) {
-    console.error('Failed to load YAML content:', error)
+    console.error('Failed to parse cached YAML content:', error)
     return null
   }
 }
