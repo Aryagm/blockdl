@@ -1,11 +1,14 @@
 /**
  * Centralized layer definitions registry for BlockDL
  * 
- * This module serves as the main API for accessing layer definitions loaded from YAML.
+ * This module serves as the main API for accessing layer definitions from the new unified TypeScript system.
  * It provides type-safe access to layer metadata, parameters, and code generation.
  */
 
-import { loadCategoriesWithLayers, getCachedYamlContent } from './yaml-layer-loader'
+import { 
+  layerDefinitions, 
+  getCategoriesWithLayers
+} from './layer-definitions'
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -17,19 +20,26 @@ export type LayerParamValue = string | number | boolean
 /** Layer parameters as key-value pairs */
 export type LayerParams = Record<string, LayerParamValue>
 
-/** Form field configuration for layer parameter editing */
+/** Form field configuration for layer parameter editing - using new system */
 export interface LayerFormField {
   key: string
   label: string
-  type: 'number' | 'text' | 'select'
-  options?: { value: string; label: string }[]
+  type: 'number' | 'text' | 'select' | 'boolean'
+  options?: { value: string; label: string; description?: string }[]
   min?: number
   max?: number
   step?: number
+  default?: string | number | boolean
+  validation?: {
+    min?: number
+    max?: number
+    required?: boolean
+    pattern?: string
+  }
   show?: (params: Record<string, LayerParamValue>) => boolean
 }
 
-/** Complete layer definition with metadata and configuration */
+/** Complete layer definition with metadata and configuration - adapts new system */
 export interface LayerDef {
   type: string
   icon: string
@@ -46,8 +56,62 @@ export interface LayerDef {
 // LAYER REGISTRY
 // ============================================================================
 
-/** Runtime registry of all loaded layer definitions */
+/** Runtime registry of all loaded layer definitions - now populated from new system */
 export const layerDefs: Record<string, LayerDef> = {}
+
+// Populate layerDefs from new system
+function initializeLayerDefs() {
+  Object.entries(layerDefinitions).forEach(([type, definition]) => {
+    const formSpec: LayerFormField[] = definition.parameters.map(param => {
+      const field: LayerFormField = {
+        key: param.key,
+        label: param.label,
+        type: param.type,
+        options: param.options,
+        min: param.validation?.min,
+        max: param.validation?.max,
+        default: param.default,
+        validation: param.validation
+      }
+
+      // Convert conditional logic from new system to old function format
+      if (param.conditional?.showWhen) {
+        field.show = (params: Record<string, LayerParamValue>) => {
+          return Object.entries(param.conditional!.showWhen!).every(([paramKey, allowedValues]) => {
+            const currentValue = String(params[paramKey] || '')
+            if (Array.isArray(allowedValues)) {
+              return allowedValues.includes(currentValue)
+            }
+            return allowedValues === currentValue
+          })
+        }
+      }
+
+      return field
+    })
+
+    const defaultParams: Record<string, LayerParamValue> = {}
+    definition.parameters.forEach(param => {
+      if (param.default !== undefined) {
+        defaultParams[param.key] = param.default
+      }
+    })
+
+    layerDefs[type] = {
+      type,
+      icon: definition.metadata.icon,
+      description: definition.metadata.description,
+      category: definition.metadata.category,
+      defaultParams,
+      formSpec,
+      codeGen: (params) => definition.generateCode.keras(params),
+      supportsMultiplier: definition.supportsMultiplier
+    }
+  })
+}
+
+// Initialize on module load
+initializeLayerDefs()
 
 // ============================================================================
 // CORE API FUNCTIONS
@@ -132,24 +196,13 @@ export function getUsedKerasImports(layerTypes: string[]): string[] {
 }
 
 // ============================================================================
-// YAML INTEGRATION FUNCTIONS
+// CATEGORY INTEGRATION FUNCTIONS
 // ============================================================================
 
 /**
- * Get layer categories with their associated layers from YAML configuration
+ * Get layer categories with their associated layers from TypeScript system
  * @returns Array of category objects with layer information
  */
-export function getLayerCategoriesFromYAML() {
-  const yamlContent = getCachedYamlContent()
-  if (!yamlContent) {
-    // Silent return during initial load - this is expected behavior
-    return []
-  }
-  
-  try {
-    return loadCategoriesWithLayers(yamlContent)
-  } catch (error) {
-    console.error('Error loading categories from YAML:', error)
-    return []
-  }
+export function getLayerCategories() {
+  return getCategoriesWithLayers()
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Search, X } from "lucide-react"
 import { Input } from "./ui/input"
-import { getLayerTypes, getLayerCategoriesFromYAML } from "../lib/layer-defs"
+import { getLayerTypes, getLayerCategories } from "../lib/layer-defs"
 
 const CONFIG = {
   POLLING_INTERVAL: 100,
@@ -36,7 +36,7 @@ export default function BlockPalette({ className = "" }: BlockPaletteProps = {})
 
   const updateData = useCallback(() => {
     const types = getLayerTypes()
-    const categories = getLayerCategoriesFromYAML()
+    const categories = getLayerCategories()
     
     console.log(`🔄 BlockPalette updateData: ${types.length} types, ${categories.length} categories`)
     
@@ -58,7 +58,7 @@ export default function BlockPalette({ className = "" }: BlockPaletteProps = {})
     // Poll until data loads (YAML loading is async)
     const interval = setInterval(() => {
       const currentTypes = getLayerTypes()
-      const currentCategories = getLayerCategoriesFromYAML()
+      const currentCategories = getLayerCategories()
       
       if (currentTypes.length > 0 && currentCategories.length > 0 && 
           (currentTypes.length !== layerTypes.length || currentCategories.length !== layerCategories.length)) {

@@ -4,7 +4,7 @@
 
 import type { LayerObject } from './dag-parser'
 import { computeInputShape } from './input-layer-utils'
-import { computeYAMLDrivenShape } from './yaml-shape-loader'
+import { getLayerDefinition } from './layer-definitions'
 import { parseShape } from './utils'
 
 export interface ShapeError {
@@ -75,20 +75,39 @@ export async function computeShapes(
           continue
         }
         
-        // Compute output shape using YAML-driven computation
-        const shapeResult = await computeYAMLDrivenShape(node.type, inputShapes, node.params)
+        // Compute output shape using new layer definitions system
+        const layerDef = getLayerDefinition(node.type)
         
-        if (shapeResult.error || !shapeResult.shape) {
+        if (!layerDef) {
           errors.push({
             nodeId: node.id,
-            message: shapeResult.error || `Could not compute output shape for ${node.type} layer`
+            message: `Unknown layer type: ${node.type}`
           })
           continue
         }
         
-        outputShape = shapeResult.shape
+        // Validate input shapes
+        const validation = layerDef.validateInputs(inputShapes, node.params)
+        if (!validation.isValid) {
+          errors.push({
+            nodeId: node.id,
+            message: validation.errorMessage || `Invalid input for ${node.type} layer`
+          })
+          continue
+        }
+        
+        outputShape = layerDef.computeShape(inputShapes, node.params)
+        
+        if (!outputShape) {
+          errors.push({
+            nodeId: node.id,
+            message: `Could not compute output shape for ${node.type} layer`
+          })
+          continue
+        }
       }
       
+      // Store the computed output shape for this node
       if (outputShape) {
         nodeShapes.set(node.id, outputShape)
       }

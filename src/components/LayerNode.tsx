@@ -7,33 +7,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Button } from './ui/button'
 import { Trash2 } from 'lucide-react'
 import { getLayerDef, getDefaultParams, getLayerIcon } from '../lib/layer-defs'
-import { loadCategoriesFromYAML, getCachedYamlContent } from '../lib/yaml-layer-loader'
+import { categories } from '../lib/layer-definitions'
 import { getParameterDisplayValues, getTotalParameterCount } from '../lib/parameter-display'
 
-// Dynamic layer category color mapping from YAML
+// Dynamic layer category color mapping from new TypeScript system
 const getLayerCategoryColor = (layerType: string) => {
   try {
-    const yamlContent = getCachedYamlContent()
-    if (!yamlContent) {
-      // Fallback colors if YAML not loaded
-      return { bg: 'bg-white', border: 'border-slate-200', hover: 'hover:border-blue-300 hover:shadow-blue-200/50' }
-    }
-    
-    const categories = loadCategoriesFromYAML(yamlContent)
     const layerDef = getLayerDef(layerType)
     const categoryKey = layerDef?.category || ''
-    const category = categories[categoryKey]
+    const category = categories[categoryKey as keyof typeof categories]
     
     if (category) {
       const baseColor = category.color
       return {
-        bg: category.bg_color,
-        border: category.border_color,
+        bg: `bg-${baseColor}-50`,
+        border: `border-${baseColor}-200`,
         hover: `hover:border-${baseColor}-300 hover:shadow-${baseColor}-200/50`
       }
     }
   } catch (error) {
-    console.warn('Failed to load category colors from YAML:', error)
+    console.warn('Failed to load category colors from new system:', error)
   }
   
   // Fallback colors
@@ -87,7 +80,7 @@ export function LayerNode({ id, data }: LayerNodeProps) {
   const renderParamEditor = (field: LayerFormField) => {
     const { key, label, type, options, min, max, step, show } = field
 
-    // Check if field should be shown based on YAML-defined show function
+    // Check if field should be shown based on conditional logic
     if (show && !show(editParams)) {
       return null
     }
@@ -141,7 +134,7 @@ export function LayerNode({ id, data }: LayerNodeProps) {
     )
   }
 
-  // Use YAML-driven parameter display utilities
+  // Use parameter display utilities
   const visibleParams = getParameterDisplayValues(type, params)
   const totalParams = getTotalParameterCount(type)
 

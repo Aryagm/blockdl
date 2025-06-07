@@ -1,30 +1,29 @@
 /**
- * Input layer utilities for YAML-driven shape computation
+ * Input layer utilities for unified TypeScript layer definitions
  */
 
-import { computeYAMLDrivenShape } from './yaml-shape-loader'
-import type { LayerParams } from './layer-defs'
+import { getLayerDefinition } from './layer-definitions'
 
 /**
- * Computes shape string from input layer parameters using YAML-driven computation
+ * Computes shape string from input layer parameters using unified layer definitions
  * Used by code generation and shape computation systems.
  */
 export async function computeInputShape(params: Record<string, unknown>): Promise<string> {
   try {
-    // Use YAML-driven shape computation for Input layer
-    const shapeResult = await computeYAMLDrivenShape('Input', [], params as LayerParams)
-    if (shapeResult.shape) {
-      // Convert shape array to string format
-      return `(${shapeResult.shape.join(', ')})`
-    }
-    if (shapeResult.error) {
-      console.warn('YAML-driven shape computation error:', shapeResult.error)
+    // Use new layer definitions system for Input layer
+    const inputLayerDef = getLayerDefinition('Input')
+    if (inputLayerDef) {
+      const shape = inputLayerDef.computeShape([], params)
+      if (shape) {
+        // Convert shape array to string format
+        return `(${shape.join(', ')})`
+      }
     }
   } catch (error) {
-    console.warn('YAML-driven shape computation failed, using fallback:', error)
+    console.warn('Layer definition shape computation failed, using fallback:', error)
   }
   
-  // Fallback to legacy behavior if YAML computation fails
+  // Fallback to legacy behavior if computation fails
   if (params.shape && typeof params.shape === 'string') {
     return params.shape;
   }

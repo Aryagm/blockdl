@@ -3,8 +3,7 @@ import { addEdge, applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
 import type { Node, Edge, NodeChange, EdgeChange, Connection } from '@xyflow/react'
 import { parseGraphToDAG } from './dag-parser'
 import { computeShapes } from './shape-computation'
-import { computeYAMLDrivenShape } from './yaml-shape-loader'
-import type { LayerParams } from './layer-defs'
+import { getLayerDefinition } from './layer-definitions'
 
 interface FlowState {
   nodes: Node[]
@@ -94,15 +93,18 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       let inputShape = '(224, 224, 3)' // Default fallback shape
       
       if (inputNode?.data.params) {
-        const params = inputNode.data.params as LayerParams;
-        // Use YAML-driven shape computation for Input layer
-        const shapeResult = await computeYAMLDrivenShape('Input', [], params)
-        if (shapeResult.shape) {
-          // Convert shape array to string format
-          inputShape = `(${shapeResult.shape.join(', ')})`
-        } else if (params.shape) {
-          // Legacy fallback - convert to string
-          inputShape = String(params.shape);
+        const params = inputNode.data.params as Record<string, string | number | boolean>
+        // Use new layer definitions system for Input layer shape computation
+        const inputLayerDef = getLayerDefinition('Input')
+        if (inputLayerDef) {
+          const computedShape = inputLayerDef.computeShape([], params)
+          if (computedShape) {
+            // Convert shape array to string format
+            inputShape = `(${computedShape.join(', ')})`
+          } else if (params.shape) {
+            // Legacy fallback - convert to string
+            inputShape = String(params.shape);
+          }
         }
       }
       
