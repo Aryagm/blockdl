@@ -6,9 +6,9 @@ import { Label } from './ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Button } from './ui/button'
 import { Trash2 } from 'lucide-react'
-import { getLayerDef, getDefaultParams, getLayerIcon } from '../lib/layer-defs'
+import { getLayerDef, getDefaultParams, getLayerIcon } from '../lib/layer-definitions'
 import { categories } from '../lib/layer-definitions'
-import { getParameterDisplayValues, getTotalParameterCount } from '../lib/parameter-display'
+import { getParameterDisplayValues, getTotalParameterCount } from '../lib/layer-definitions'
 
 // Static color mapping to ensure Tailwind classes are included in build
 const categoryColorMap: Record<string, { bg: string; border: string; hover: string }> = {
@@ -80,7 +80,7 @@ const getLayerCategoryColor = (layerType: string) => {
   return { bg: 'bg-white', border: 'border-slate-200', hover: 'hover:border-blue-300 hover:shadow-blue-200/50' }
 }
 
-import type { LayerParamValue, LayerFormField } from '../lib/layer-defs'
+import type { LayerParamValue, LayerFormField } from '../lib/layer-definitions'
 
 interface LayerNodeData {
   type: string

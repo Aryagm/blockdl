@@ -10,7 +10,7 @@
  */
 
 import type { Node, Edge } from '@xyflow/react'
-import type { LayerParams } from './layer-defs'
+import type { LayerParams } from './layer-definitions'
 import graphlib from 'graphlib'
 
 /**

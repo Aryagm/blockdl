@@ -3,7 +3,7 @@
  */
 
 import type { LayerObject } from './dag-parser'
-import { computeInputShape } from './input-layer-utils'
+import { computeInputShape } from './layer-definitions'
 import { getLayerDefinition } from './layer-definitions'
 import { parseShape } from './utils'
 

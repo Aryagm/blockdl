@@ -26,7 +26,7 @@ import type {
 import "@xyflow/react/dist/style.css";
 
 import { LayerNode } from "./LayerNode";
-import { getDefaultParams } from "../lib/layer-defs";
+import { getDefaultParams } from "../lib/layer-definitions";
 import { useFlowStore } from "../lib/flow-store";
 import { cn } from "../lib/utils";
 

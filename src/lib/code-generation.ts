@@ -3,8 +3,7 @@
  */
 
 import type { DAGResult, LayerObject } from './dag-parser'
-import { generateLayerCode, getUsedKerasImports } from './layer-defs'
-import { computeInputShape } from './input-layer-utils'
+import { generateLayerCode, getUsedKerasImports, computeInputShape } from './layer-definitions'
 
 /**
  * Common compilation and summary code for both Sequential and Functional API
