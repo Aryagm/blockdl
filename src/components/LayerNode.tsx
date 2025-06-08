@@ -6,14 +6,14 @@ import { Label } from './ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Button } from './ui/button'
 import { Trash2 } from 'lucide-react'
-import { 
-  getLayerDef, 
+import {
+  getLayerDef,
   getDefaultParams, 
   getLayerIcon
-} from '../lib/layer-compatibility'
+} from '../lib/layer-definitions'
 import { getLayerCategoryColors } from '../lib/layer-categories'
 import { getParameterDisplayValues, getTotalParameterCount } from '../lib/layer-display'
-import type { LayerParamValue, LayerFormField } from '../lib/layer-compatibility'
+import type { LayerParamValue, LayerFormField } from '../lib/layer-definitions'
 
 interface LayerNodeData {
   type: string

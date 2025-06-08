@@ -3,7 +3,7 @@
  */
 
 import type { DAGResult, LayerObject } from './dag-parser'
-import { generateLayerCode, getUsedKerasImports } from './layer-compatibility'
+import { generateLayerCode, getUsedKerasImports } from './layer-definitions'
 import { getLayerDefinition } from './layer-definitions'
 
 /**

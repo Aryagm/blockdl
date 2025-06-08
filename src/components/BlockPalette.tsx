@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Search, X } from "lucide-react"
 import { Input } from "./ui/input"
-import { getLayerTypes, getLayerCategories } from "../lib/layer-compatibility"
+import { getLayerTypes, getLayerCategories } from "../lib/layer-definitions"
 
 const CONFIG = {
   POLLING_INTERVAL: 100,

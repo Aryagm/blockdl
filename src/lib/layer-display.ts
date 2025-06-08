@@ -4,8 +4,8 @@
  * Functions for formatting and displaying layer parameters in the UI.
  */
 
-import type { LayerParamValue } from './layer-compatibility'
-import { getLayerDef } from './layer-compatibility'
+import type { LayerParamValue } from './layer-definitions'
+import { getLayerDef } from './layer-definitions'
 import { getLayerDefinition } from './layer-definitions'
 
 // ============================================================================
