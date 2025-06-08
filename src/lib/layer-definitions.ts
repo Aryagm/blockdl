@@ -1050,6 +1050,25 @@ export function addLayer(layerType: string, definition: LayerDefinition): void {
   layerDefinitions[layerType] = definition
 }
 
+/**
+ * Get category colors for a specific layer type
+ * @param layerType - Layer type identifier
+ * @returns Color classes object with bg, border, text, and hover properties
+ */
+export function getLayerCategoryColors(layerType: string): { bg: string; border: string; text: string; hover: string } {
+  const layerDef = getLayerDefinition(layerType)
+  if (!layerDef) {
+    return categoryColorMap.blue // fallback to blue
+  }
+  
+  const category = categories[layerDef.metadata.category as keyof typeof categories]
+  if (!category?.color) {
+    return categoryColorMap.blue // fallback to blue
+  }
+  
+  return categoryColorMap[category.color] || categoryColorMap.blue
+}
+
 // ============================================================================
 // LEGACY COMPATIBILITY FUNCTIONS (from layer-defs.ts)
 // ============================================================================
