@@ -16,17 +16,17 @@ interface FlowState {
   onEdgesChange: (changes: EdgeChange[]) => void
   onConnect: (connection: Connection) => void
   addNode: (node: Node) => void
-  updateShapeErrors: () => Promise<void>
+  updateShapeErrors: () => void
 }
 
 // Constants for configuration
 const SHAPE_UPDATE_DEBOUNCE_MS = 100
-const DEFAULT_INPUT_SHAPE = '(224, 224, 3)'
+const DEFAULT_INPUT_SHAPE = '(28, 28, 1)'
 
 // Debouncing utility for shape error updates
 let shapeUpdateTimeout: NodeJS.Timeout | null = null
 
-const scheduleShapeUpdate = (updateFn: () => Promise<void>) => {
+const scheduleShapeUpdate = (updateFn: () => void) => {
   if (shapeUpdateTimeout) {
     clearTimeout(shapeUpdateTimeout)
   }
@@ -141,7 +141,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     scheduleShapeUpdate(() => get().updateShapeErrors())
   },
 
-  updateShapeErrors: async () => {
+  updateShapeErrors: () => {
     const { nodes, edges } = get()
     
     // Early return if no nodes to process
@@ -171,7 +171,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       }
       
       // Compute shapes for each node
-      const { errors } = await computeShapes(dagResult, inputShape)
+      const { errors } = computeShapes(dagResult, inputShape)
       const errorMap = new Map<string, string>()
       
       errors.forEach(error => {
