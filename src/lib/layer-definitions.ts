@@ -1163,7 +1163,7 @@ function initializeLayerDefs() {
         if (multiplier > 1 && definition.supportsMultiplier) {
           if (multiplier >= 5) {
             // High multiplier case - use spread syntax with range for readability
-            return `# Repeated ${multiplier} times for better feature extraction\n*[${baseCode} for _ in range(${multiplier})]`
+            return `# Repeated ${multiplier} times\n    *[${baseCode} for _ in range(${multiplier})]`
           } else {
             // Low multiplier case - list individual layers
             return Array(multiplier).fill(baseCode).join(',\n    ')

@@ -15,38 +15,29 @@ const COMPILATION_TEMPLATE = [
 ] as const
 
 /**
- * Helper function to add commas to layer code lines
+ * Helper function to format layer code for Sequential API
  */
-function formatLayerLine(line: string, isLastLayer: boolean): string {
-  const trimmed = line.trim()
-  if (trimmed.startsWith('*[') && trimmed.endsWith(']')) {
-    // Spread operator syntax - add comma unless it's the last layer
-    return `${line}${isLastLayer ? '' : ','}`
+function formatSequentialLayer(layerCode: string, isLastLayer: boolean): string[] {
+  const lines = layerCode.split('\n')
+  
+  if (lines.length === 1) {
+    // Single line - add indentation and comma if needed
+    const needsComma = !isLastLayer && !layerCode.trim().endsWith(',')
+    return [`    ${layerCode}${needsComma ? ',' : ''}`]
   }
   
-  // Regular layer code - add comma unless it already has one or it's the last layer
-  const hasComma = trimmed.endsWith(',')
-  const needsComma = !hasComma && !isLastLayer
-  return `${line}${needsComma ? ',' : ''}`
-}
-
-/**
- * Helper function to process multi-line layer code
- */
-function processMultiLineLayerCode(layerCode: string, isLastLayer: boolean): string[] {
-  const lines = layerCode.split('\n')
-  const result: string[] = []
-  
-  lines.forEach((line, index) => {
+  // Multi-line - handle each line appropriately
+  return lines.map((line, index) => {
     if (index === 0) {
-      // First line is typically a comment
-      result.push(`    ${line}`)
-    } else {
-      result.push(formatLayerLine(line, isLastLayer))
+      return `    ${line}` // Comment line with indentation
     }
+    
+    const trimmed = line.trim()
+    if (index === lines.length - 1 && !isLastLayer && !trimmed.endsWith(',')) {
+      return `${line},` // Add comma to last line if needed
+    }
+    return line
   })
-  
-  return result
 }
 
 /**
@@ -75,13 +66,8 @@ export function generateKerasCode(layers: LayerObject[]): string {
     if (!layerCode) return
 
     const isLastLayer = index === layers.length - 1
-    const lines = layerCode.split('\n')
-
-    if (lines.length > 1) {
-      modelLines.push(...processMultiLineLayerCode(layerCode, isLastLayer))
-    } else {
-      modelLines.push(`    ${formatLayerLine(layerCode, isLastLayer)}`)
-    }
+    const formattedLines = formatSequentialLayer(layerCode, isLastLayer)
+    modelLines.push(...formattedLines)
   })
 
   modelLines.push('])')
@@ -90,31 +76,58 @@ export function generateKerasCode(layers: LayerObject[]): string {
 }
 
 /**
- * Helper interface for layer processing context
+ * Processes a layer for Functional API code generation
  */
-interface LayerContext {
-  layer: LayerObject
-  inputNodes: string[]
-  codeLines: string[]
-  layerVariables: Map<string, string>
+function processLayer(layer: LayerObject, inputNodes: string[], codeLines: string[], layerVariables: Map<string, string>): void {
+  const { id, varName } = layer
+  const layerCode = generateLayerCode(layer.type, layer.params)
+  
+  if (!layerCode) {
+    codeLines.push(`# Error: Could not generate code for ${layer.type}`)
+    return
+  }
+
+  // Handle multiplier layers (multi-line code with special syntax)
+  if (layerCode.includes('\n')) {
+    processMultiplierLayer(layer, layerCode, inputNodes, codeLines, layerVariables)
+    return
+  }
+
+  // Handle single layers
+  if (inputNodes.length === 0) {
+    codeLines.push(`# Warning: ${varName} has no inputs`)
+    codeLines.push(`${varName} = ${layerCode}`)
+  } else if (inputNodes.length === 1) {
+    codeLines.push(`${varName} = ${layerCode}(${inputNodes[0]})`)
+  } else {
+    // Multiple inputs
+    codeLines.push(`${varName} = ${layerCode}([${inputNodes.join(', ')}])`)
+  }
+  
+  layerVariables.set(id, varName)
 }
 
 /**
  * Processes multiplier layers with better readability for Functional API
  */
-function processMultiplierLayer(context: LayerContext, layerCode: string): void {
-  const { layer, inputNodes, codeLines, layerVariables } = context
+function processMultiplierLayer(
+  layer: LayerObject, 
+  layerCode: string, 
+  inputNodes: string[], 
+  codeLines: string[], 
+  layerVariables: Map<string, string>
+): void {
   const { id, varName } = layer
   const lines = layerCode.split('\n')
 
-  if (lines[0].trim().startsWith('#')) {
+  if (lines[0].trim().startsWith('#') && inputNodes.length === 1) {
     // High multiplier case - use loop for better readability
     const spreadLine = lines[1]
     const match = spreadLine.match(/\*\[(.+?) for _ in range\((\d+)\)\]/)
     
     codeLines.push(lines[0]) // Add comment
     
-    if (match && inputNodes.length === 1) {
+    if (match) {
       const [, layerConstructor, count] = match
       codeLines.push(`${varName} = ${inputNodes[0]}`)
       codeLines.push(`for _ in range(${count}):`)
@@ -125,10 +138,11 @@ function processMultiplierLayer(context: LayerContext, layerCode: string): void 
       codeLines.push(`${varName} = ${spreadLine}${inputs}`)
     }
   } else {
-    // Low multiplier case - chain individual layers
+    // Low multiplier case or multiple inputs
     const individualLayers = layerCode.split(',\n    ').map(l => l.trim())
     
-    if (inputNodes.length === 1) {
+    if (inputNodes.length === 1 && individualLayers.length > 1) {
+      // Chain individual layers
       let currentVar = inputNodes[0]
       individualLayers.forEach((layer, index) => {
         if (index === 0) {
@@ -143,37 +157,14 @@ function processMultiplierLayer(context: LayerContext, layerCode: string): void 
       })
       
       // Update final variable reference
-      if (individualLayers.length > 1) {
-        const finalVar = `${varName}_${individualLayers.length - 1}`
-        layerVariables.set(id, finalVar)
-        return // Don't set varName again below
-      }
+      const finalVar = `${varName}_${individualLayers.length - 1}`
+      layerVariables.set(id, finalVar)
+      return
     } else {
-      // Multiple inputs - use first layer only
+      // Use first layer only for multiple inputs or single layer
       const inputs = inputNodes.length > 0 ? `([${inputNodes.join(', ')}])` : ''
       codeLines.push(`${varName} = ${individualLayers[0]}${inputs}`)
     }
-  }
-  
-  layerVariables.set(id, varName)
-}
-
-/**
- * Processes a single layer for Functional API
- */
-function processSingleLayer(context: LayerContext, layerCode: string): void {
-  const { layer, inputNodes, codeLines, layerVariables } = context
-  const { id, varName } = layer
-  
-  if (inputNodes.length === 0) {
-    codeLines.push(`# Warning: ${varName} has no inputs`)
-    codeLines.push(`${varName} = ${layerCode}`)
-  } else if (inputNodes.length === 1) {
-    codeLines.push(`${varName} = ${layerCode}(${inputNodes[0]})`)
-  } else {
-    // Multiple inputs
-    const inputs = `([${inputNodes.join(', ')}])`
-    codeLines.push(`${varName} = ${layerCode}${inputs}`)
   }
   
   layerVariables.set(id, varName)
@@ -204,20 +195,19 @@ function findTerminalNodes(orderedNodes: LayerObject[], edgeMap: Map<string, str
   const inputVars: string[] = []
   const outputVars: string[] = []
   
-  orderedNodes.forEach(layer => {
+  for (const layer of orderedNodes) {
     const variable = layerVariables.get(layer.id)
-    if (!variable) return
+    if (!variable) continue
     
     if (layer.type === 'Input') {
       inputVars.push(variable)
     }
     
     // Check if this is an output node (no outgoing edges)
-    const hasOutgoing = edgeMap.has(layer.id) && edgeMap.get(layer.id)!.length > 0
-    if (!hasOutgoing) {
+    if (!edgeMap.has(layer.id) || edgeMap.get(layer.id)!.length === 0) {
       outputVars.push(variable)
     }
-  })
+  }
   
   return { inputVars, outputVars }
 }
@@ -254,16 +244,8 @@ export async function generateFunctionalKerasCode(dagResult: DAGResult): Promise
       codeLines.push(`${varName} = Input(shape=${shape})`)
       layerVariables.set(id, varName)
     } else {
-      const layerCode = generateLayerCode(type, params)
       const inputNodes = findInputNodes(id, edgeMap, layerVariables)
-      
-      const context: LayerContext = { layer, inputNodes, codeLines, layerVariables }
-      
-      if (layerCode.includes('\n')) {
-        processMultiplierLayer(context, layerCode)
-      } else {
-        processSingleLayer(context, layerCode)
-      }
+      processLayer(layer, inputNodes, codeLines, layerVariables)
     }
   }
 
@@ -271,13 +253,12 @@ export async function generateFunctionalKerasCode(dagResult: DAGResult): Promise
   const { inputVars, outputVars } = findTerminalNodes(orderedNodes, edgeMap, layerVariables)
   
   codeLines.push('')
-  if (inputVars.length === 1 && outputVars.length === 1) {
-    codeLines.push(`model = Model(inputs=${inputVars[0]}, outputs=${outputVars[0]})`)
-  } else {
-    const inputs = inputVars.length === 1 ? inputVars[0] : `[${inputVars.join(', ')}]`
-    const outputs = outputVars.length === 1 ? outputVars[0] : `[${outputVars.join(', ')}]`
-    codeLines.push(`model = Model(inputs=${inputs}, outputs=${outputs})`)
-  }
+  
+  // Format inputs and outputs for the Model constructor
+  const inputs = inputVars.length === 1 ? inputVars[0] : `[${inputVars.join(', ')}]`
+  const outputs = outputVars.length === 1 ? outputVars[0] : `[${outputVars.join(', ')}]`
+  
+  codeLines.push(`model = Model(inputs=${inputs}, outputs=${outputs})`)
 
   return [...codeLines, ...COMPILATION_TEMPLATE].join('\n')
 }
