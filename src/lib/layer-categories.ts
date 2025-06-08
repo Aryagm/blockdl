@@ -158,3 +158,16 @@ export function getLayerCategoryColors(layerType: string): { bg: string; border:
   
   return categoryColorMap[categoryInfo.color] || categoryColorMap.blue
 }
+
+/**
+ * Get category colors by category key
+ */
+export function getCategoryColorsByKey(categoryKey: string): { bg: string; border: string; text: string; hover: string } {
+  const categoryInfo = categories[categoryKey as keyof typeof categories]
+  
+  if (!categoryInfo?.color) {
+    return categoryColorMap.blue // fallback to blue
+  }
+  
+  return categoryColorMap[categoryInfo.color] || categoryColorMap.blue
+}
