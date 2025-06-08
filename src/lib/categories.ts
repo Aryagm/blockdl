@@ -18,6 +18,12 @@ export const categories: Record<string, CategoryDefinition> = {
     description: 'Start and end points of your network',
     icon: '🔌'
   },
+  core: {
+    name: 'Core Layers',
+    color: 'slate',
+    description: 'Essential building blocks for neural networks',
+    icon: '🧱'
+  },
   dense: {
     name: 'Dense Layers',
     color: 'blue', 
@@ -129,6 +135,12 @@ const categoryColorMap: Record<string, { bg: string; border: string; text: strin
     border: 'border-teal-200',
     text: 'text-teal-700',
     hover: 'hover:border-teal-300 hover:shadow-teal-200/50'
+  },
+  slate: {
+    bg: 'bg-slate-50',
+    border: 'border-slate-200',
+    text: 'text-slate-700',
+    hover: 'hover:border-slate-300 hover:shadow-slate-200/50'
   }
 }
 
@@ -161,12 +173,12 @@ export function getLayerCategoryColors(layerType: string): { bg: string; border:
   const layerToCategoryMap: Record<string, string> = {
     'Input': 'input_output',
     'Output': 'input_output',
-    'Dense': 'dense',
+    'Dense': 'core',
     'Conv2D': 'convolutional',
     'MaxPool2D': 'pooling',
     'Flatten': 'transformation',
-    'Activation': 'activation',
-    'Dropout': 'regularization'
+    'Activation': 'core',
+    'Dropout': 'core'
   }
   
   const category = layerToCategoryMap[layerType] || 'dense'

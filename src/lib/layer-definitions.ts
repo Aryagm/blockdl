@@ -354,7 +354,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
   
   Dense: {
     metadata: {
-      category: 'dense',
+      category: 'core',
       icon: '🔗',
       description: 'Fully connected layer',
       tags: ['dense', 'fully-connected']
@@ -691,7 +691,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
   
   Activation: {
     metadata: {
-      category: 'activation',
+      category: 'core',
       icon: '⚡',
       description: 'Applies activation function',
       tags: ['activation', 'nonlinearity'],
@@ -753,7 +753,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
   
   Dropout: {
     metadata: {
-      category: 'regularization',
+      category: 'core',
       icon: '🛡️',
       description: 'Randomly sets input units to 0 during training',
       tags: ['dropout', 'regularization'],
