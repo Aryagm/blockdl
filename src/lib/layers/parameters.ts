@@ -5,7 +5,7 @@
  * for all layer types. This provides a clean interface for parameter management.
  */
 
-import { layerDefinitions, type ParameterDefinition } from './definitions'
+import { layerDefinitions, type ParameterDefinition, type SelectOption } from '../layer-definitions'
 
 // ============================================================================
 // LEGACY COMPATIBILITY TYPES
@@ -46,7 +46,7 @@ export function getDefaultParams(layerType: string): Record<string, LayerParamVa
   
   const defaultParams: Record<string, LayerParamValue> = {}
   
-  definition.parameters.forEach(param => {
+  definition.parameters.forEach((param: ParameterDefinition) => {
     if (param.default !== undefined) {
       defaultParams[param.key] = param.default
     }
@@ -67,7 +67,7 @@ export function getLayerFormSpec(layerType: string): LayerFormField[] {
   const definition = layerDefinitions[layerType]
   if (!definition) return []
   
-  const formSpec: LayerFormField[] = definition.parameters.map(param => {
+  const formSpec: LayerFormField[] = definition.parameters.map((param: ParameterDefinition) => {
     const field: LayerFormField = {
       key: param.key,
       label: param.label,
@@ -123,7 +123,7 @@ export function validateParameterValues(
   
   const errors: string[] = []
   
-  definition.parameters.forEach(param => {
+  definition.parameters.forEach((param: ParameterDefinition) => {
     const value = params[param.key]
     
     // Check required parameters
@@ -166,7 +166,7 @@ export function validateParameterValues(
     // Validate select parameters
     if (param.type === 'select' && param.options) {
       const stringValue = String(value)
-      const validValues = param.options.map(opt => opt.value)
+      const validValues = param.options.map((opt: SelectOption) => opt.value)
       if (!validValues.includes(stringValue)) {
         errors.push(`${param.label} must be one of: ${validValues.join(', ')}`)
       }
@@ -183,7 +183,7 @@ export function getParameterInfo(layerType: string, paramKey: string): Parameter
   const definition = layerDefinitions[layerType]
   if (!definition) return undefined
   
-  return definition.parameters.find(param => param.key === paramKey)
+  return definition.parameters.find((param: ParameterDefinition) => param.key === paramKey)
 }
 
 /**
@@ -193,7 +193,7 @@ export function getParameterKeys(layerType: string): string[] {
   const definition = layerDefinitions[layerType]
   if (!definition) return []
   
-  const keys = definition.parameters.map(param => param.key)
+  const keys = definition.parameters.map((param: ParameterDefinition) => param.key)
   
   // Add multiplier for layers that support it
   if (definition.supportsMultiplier) {
@@ -252,7 +252,7 @@ export function getVisibleParameters(
   const definition = layerDefinitions[layerType]
   if (!definition) return []
   
-  return definition.parameters.filter(param => 
+  return definition.parameters.filter((param: ParameterDefinition) => 
     shouldShowParameter(layerType, param.key, currentParams)
   )
 }

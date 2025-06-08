@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Search, X } from "lucide-react"
 import { Input } from "./ui/input"
-import { getLayerTypes } from "../lib/layers/definitions"
+import { getLayerTypes } from "../lib/layer-definitions"
 import { getLayerCategories } from "../lib/categories"
 
 const CONFIG = {

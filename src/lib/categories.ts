@@ -5,7 +5,7 @@
  * Defines the visual categorization and theming for different types of neural network layers.
  */
 
-import { getLayersByCategory } from './layers/definitions'
+import { getLayersByCategory } from './layer-definitions'
 
 // ============================================================================
 // CATEGORY DEFINITIONS

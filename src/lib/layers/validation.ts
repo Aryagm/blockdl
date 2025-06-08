@@ -5,7 +5,7 @@
  * receive the correct input shapes and can provide meaningful error messages.
  */
 
-import { layerDefinitions } from './definitions'
+import { layerDefinitions } from '../layer-definitions'
 
 // ============================================================================
 // VALIDATION TYPES

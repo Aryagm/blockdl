@@ -5,7 +5,7 @@
  */
 
 import type { LayerParamValue } from './layers/parameters'
-import { getLayerDefinition } from './layers/definitions'
+import { getLayerDefinition } from './layer-definitions'
 import { getLayerFormSpec } from './layers/parameters'
 
 // ============================================================================

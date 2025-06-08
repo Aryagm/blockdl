@@ -10,7 +10,7 @@
  * To add a new layer, simply add it to the layerDefinitions object below.
  */
 
-import { parseShape, parseTupleOrNumber } from './utils'
+import { parseTupleOrNumber } from './utils'
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -22,38 +22,7 @@ export type ParameterType = 'number' | 'text' | 'select' | 'boolean'
 export type LayerParamValue = string | number | boolean
 export type LayerParams = Record<string, LayerParamValue>
 
-// Form field configuration for layer parameter editing
-export interface LayerFormField {
-  key: string
-  label: string
-  type: 'number' | 'text' | 'select' | 'boolean'
-  options?: { value: string; label: string; description?: string }[]
-  min?: number
-  max?: number
-  step?: number
-  default?: string | number | boolean
-  validation?: {
-    min?: number
-    max?: number
-    required?: boolean
-    pattern?: string
-  }
-  show?: (params: Record<string, LayerParamValue>) => boolean
-}
-
-// Complete layer definition with metadata and configuration (legacy format)
-export interface LayerDef {
-  type: string
-  icon: string
-  description: string
-  category: string
-  defaultParams: Record<string, LayerParamValue>
-  formSpec: LayerFormField[]
-  codeGen: (params: Record<string, LayerParamValue>) => string
-  kerasImport?: string
-  supportsMultiplier?: boolean
-}
-
+// New type system for layer definitions
 export interface SelectOption {
   value: string
   label: string
@@ -108,10 +77,43 @@ export interface LayerDefinition {
   computeShape: (inputShapes: number[][], params: Record<string, unknown>) => number[] | null
   generateCode: CodeGenerator
   supportsMultiplier?: boolean
+  supportsActivation?: boolean
+}
+
+// Form field configuration for layer parameter editing (legacy format)
+export interface LayerFormField {
+  key: string
+  label: string
+  type: 'number' | 'text' | 'select' | 'boolean'
+  options?: { value: string; label: string; description?: string }[]
+  min?: number
+  max?: number
+  step?: number
+  default?: string | number | boolean
+  validation?: {
+    min?: number
+    max?: number
+    required?: boolean
+    pattern?: string
+  }
+  show?: (params: Record<string, LayerParamValue>) => boolean
+}
+
+// Complete layer definition with metadata and configuration (legacy format)
+export interface LayerDef {
+  type: string
+  icon: string
+  description: string
+  category: string
+  defaultParams: Record<string, LayerParamValue>
+  formSpec: LayerFormField[]
+  codeGen: (params: Record<string, LayerParamValue>) => string
+  supportsMultiplier?: boolean
+  supportsActivation?: boolean
 }
 
 // ============================================================================
-// LAYER DEFINITIONS
+// NEW LAYER DEFINITIONS (Main SYSTEM)
 // ============================================================================
 
 export const layerDefinitions: Record<string, LayerDefinition> = {
@@ -202,101 +204,75 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         conditional: { showWhen: { inputType: ['sequence'] } }
       }
     ],
-    validateInputs: (inputShapes, params) => {
-      // Input layers don't require input validation as they are the starting point
-      // Parameters are required by interface but not used in this implementation
-      void inputShapes; // Explicitly mark as intentionally unused
-      void params;      // Explicitly mark as intentionally unused
-      return { isValid: true }
-    },
-    computeShape: (inputShapes, params) => {
-      // Input layers determine their own shape
-      void inputShapes; // Explicitly mark as intentionally unused
-      // Input layers determine their own shape
-      if (params.computed_shape || params.shape) {
-        const shapeString = String(params.computed_shape || params.shape || '(784,)')
-        return parseShape(shapeString)
-      }
-      
+    validateInputs: () => ({ isValid: true }),
+    computeShape: (_inputShapes: number[][], params: Record<string, unknown>) => {
       const inputType = String(params.inputType || 'image_grayscale')
-      const height = Number(params.height) || 28
-      const width = Number(params.width) || 28
-      const channels = Number(params.channels) || 1
       
       switch (inputType) {
-        case 'image_grayscale':
-          return [height, width, 1]
-        case 'image_color':
-          return [height, width, 3]
-        case 'image_custom':
-          return [height, width, channels]
-        case 'flat_data':
-          return [Number(params.flatSize) || 784]
-        case 'sequence':
-          return [Number(params.seqLength) || 100, Number(params.features) || 128]
-        default:
-          return [784]
+        case 'image_grayscale': {
+          const h = Number(params.height) || 28
+          const w = Number(params.width) || 28
+          return [h, w, 1]
+        }
+        case 'image_color': {
+          const h = Number(params.height) || 28
+          const w = Number(params.width) || 28
+          return [h, w, 3]
+        }
+        case 'image_custom': {
+          const h = Number(params.height) || 28
+          const w = Number(params.width) || 28
+          const c = Number(params.channels) || 1
+          return [h, w, c]
+        }
+        case 'flat_data': {
+          const size = Number(params.flatSize) || 784
+          return [size]
+        }
+        case 'sequence': {
+          const seqLen = Number(params.seqLength) || 100
+          const features = Number(params.features) || 128
+          return [seqLen, features]
+        }
+        default: {
+          return [28, 28, 1]
+        }
       }
     },
     generateCode: {
-      keras: (params) => {
+      keras: (params: Record<string, unknown>) => {
         const inputType = String(params.inputType || 'image_grayscale')
-        const height = Number(params.height) || 28
-        const width = Number(params.width) || 28
-        const channels = Number(params.channels) || 1
         
-        let shape: string
         switch (inputType) {
-          case 'image_grayscale':
-            shape = `(${height}, ${width}, 1)`
-            break
-          case 'image_color':
-            shape = `(${height}, ${width}, 3)`
-            break
-          case 'image_custom':
-            shape = `(${height}, ${width}, ${channels})`
-            break
-          case 'flat_data':
-            shape = `(${Number(params.flatSize) || 784},)`
-            break
-          case 'sequence':
-            shape = `(${Number(params.seqLength) || 100}, ${Number(params.features) || 128})`
-            break
-          default:
-            shape = '(784,)'
+          case 'image_grayscale': {
+            const h = Number(params.height) || 28
+            const w = Number(params.width) || 28
+            return `Input(shape=(${h}, ${w}, 1))`
+          }
+          case 'image_color': {
+            const h = Number(params.height) || 28
+            const w = Number(params.width) || 28
+            return `Input(shape=(${h}, ${w}, 3))`
+          }
+          case 'image_custom': {
+            const h = Number(params.height) || 28
+            const w = Number(params.width) || 28
+            const c = Number(params.channels) || 1
+            return `Input(shape=(${h}, ${w}, ${c}))`
+          }
+          case 'flat_data': {
+            const size = Number(params.flatSize) || 784
+            return `Input(shape=(${size},))`
+          }
+          case 'sequence': {
+            const seqLen = Number(params.seqLength) || 100
+            const features = Number(params.features) || 128
+            return `Input(shape=(${seqLen}, ${features}))`
+          }
+          default: {
+            return `Input(shape=(28, 28, 1))`
+          }
         }
-        
-        return `Input(shape=${shape})`
-      },
-      pytorch: (params) => {
-        // PyTorch doesn't have explicit Input layers, but we can document the expected shape
-        const inputType = String(params.inputType || 'image_grayscale')
-        const height = Number(params.height) || 28
-        const width = Number(params.width) || 28
-        const channels = Number(params.channels) || 1
-        
-        let shape: string
-        switch (inputType) {
-          case 'image_grayscale':
-            shape = `[batch_size, 1, ${height}, ${width}]`
-            break
-          case 'image_color':
-            shape = `[batch_size, 3, ${height}, ${width}]`
-            break
-          case 'image_custom':
-            shape = `[batch_size, ${channels}, ${height}, ${width}]`
-            break
-          case 'flat_data':
-            shape = `[batch_size, ${Number(params.flatSize) || 784}]`
-            break
-          case 'sequence':
-            shape = `[batch_size, ${Number(params.seqLength) || 100}, ${Number(params.features) || 128}]`
-            break
-          default:
-            shape = '[batch_size, 784]'
-        }
-        
-        return `# Expected input shape: ${shape}`
       }
     }
   },
@@ -413,40 +389,36 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       category: 'dense',
       icon: '🔗',
       description: 'Fully connected layer',
-      tags: ['dense', 'fully_connected'],
-      performance: {
-        complexity: 'O(n*m) where n=input_size, m=units',
-        memory: 'High for large layers',
-        usage: 'Feature learning and classification'
-      }
+      tags: ['dense', 'fully-connected']
     },
     parameters: [
       {
         key: 'units',
         type: 'number',
         label: 'Units',
-        description: 'Number of output neurons',
+        description: 'Number of neurons',
         default: 128,
-        validation: { min: 1, max: 10000, required: true },
-        ui: { tooltip: 'Number of neurons in this dense layer' }
+        validation: { min: 1, max: 10000, required: true }
       },
       {
         key: 'activation',
         type: 'select',
-        label: 'Activation (optional)',
-        description: 'Activation function to apply',
-        default: 'none',
+        label: 'Activation',
+        description: 'Activation function to use',
+        default: 'linear',
         options: [
-          { value: 'none', label: 'None', description: 'Linear activation' },
-          { value: 'relu', label: 'ReLU', description: 'Most common for hidden layers' },
-          { value: 'sigmoid', label: 'Sigmoid', description: 'Outputs between 0 and 1' },
-          { value: 'tanh', label: 'Tanh', description: 'Outputs between -1 and 1' },
+          { value: 'linear', label: 'Linear (None)', description: 'No activation function' },
+          { value: 'relu', label: 'ReLU', description: 'Rectified Linear Unit' },
+          { value: 'sigmoid', label: 'Sigmoid', description: 'Sigmoid function' },
+          { value: 'tanh', label: 'Tanh', description: 'Hyperbolic Tangent' },
           { value: 'softmax', label: 'Softmax', description: 'For probability distributions' }
         ]
       }
     ],
-    validateInputs: (inputShapes, params) => {
-      void params; // Explicitly mark as intentionally unused
+    validateInputs: (inputShapes: number[][]) => {
+      if (inputShapes.length === 0) {
+        return { isValid: false, errorMessage: 'Dense layer requires input' }
+      }
       if (inputShapes.length !== 1) {
         return { isValid: false, errorMessage: 'Dense layer requires exactly one input' }
       }
@@ -456,46 +428,32 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       }
       return { isValid: true }
     },
-    computeShape: (inputShapes, params) => {
+    computeShape: (inputShapes: number[][], params: Record<string, unknown>) => {
       if (inputShapes.length !== 1) return null
       const inputShape = inputShapes[0]
-      if (inputShape.length > 2) return null
+      if (inputShape.length > 2) return null // Dense needs flat input
       
-      return [Number(params.units) || 128]
+      const units = Number(params.units) || 128
+      return [units]
     },
     generateCode: {
-      keras: (params) => {
+      keras: (params: Record<string, unknown>) => {
         const units = Number(params.units) || 128
-        const activation = String(params.activation || 'none')
+        const activation = String(params.activation) || 'linear'
         
-        if (activation === 'none') {
+        if (activation === 'linear') {
           return `Dense(${units})`
         } else {
           return `Dense(${units}, activation='${activation}')`
         }
       },
-      pytorch: (params) => {
+      pytorch: (params: Record<string, unknown>) => {
         const units = Number(params.units) || 128
-        const activation = String(params.activation || 'none')
-        
-        let code = `nn.Linear(in_features, ${units})`
-        
-        if (activation !== 'none') {
-          const activationMap: Record<string, string> = {
-            'relu': 'nn.ReLU()',
-            'sigmoid': 'nn.Sigmoid()',
-            'tanh': 'nn.Tanh()',
-            'softmax': 'nn.Softmax(dim=1)'
-          }
-          if (activationMap[activation]) {
-            code += `,\n${activationMap[activation]}`
-          }
-        }
-        
-        return code
+        return `nn.Linear(in_features, ${units})`
       }
     },
-    supportsMultiplier: true
+    supportsMultiplier: true,
+    supportsActivation: true
   },
 
   // CONVOLUTIONAL LAYERS  
@@ -616,7 +574,8 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         return `nn.Conv2d(in_channels, ${filters}, kernel_size=${kernelSize[0]}, stride=${strides[0]}, padding='${paddingValue}')`
       }
     },
-    supportsMultiplier: true
+    supportsMultiplier: true,
+    supportsActivation: true
   },
 
   // POOLING LAYERS
@@ -984,7 +943,8 @@ function initializeLayerDefs() {
         
         return baseCode
       },
-      supportsMultiplier: definition.supportsMultiplier
+      supportsMultiplier: definition.supportsMultiplier,
+      supportsActivation: definition.supportsActivation
     }
   })
 }
@@ -1036,6 +996,20 @@ export function generateLayerCode(type: string, params: Record<string, LayerPara
 }
 
 /**
+ * Get required Keras imports for a layer type
+ */
+export function getKerasImports(layerType: string): string[] {
+  const layerDef = layerDefs[layerType]
+  if (!layerDef) {
+    return []
+  }
+  const imports = new Set<string>()
+  // Add import based on layer type
+  imports.add(layerType)
+  return Array.from(imports)
+}
+
+/**
  * Get required Keras imports for a list of layer types
  */
 export function getUsedKerasImports(layerTypes: string[]): string[] {
@@ -1053,6 +1027,57 @@ export function getUsedKerasImports(layerTypes: string[]): string[] {
 }
 
 import { categories, getCategoryColorsByKey } from './categories'
+
+/**
+ * Get form specification for a layer type (legacy compatibility)
+ */
+export function getLayerFormSpec(layerType: string): LayerFormField[] {
+  const definition = layerDefinitions[layerType]
+  if (!definition) return []
+  
+  const formSpec: LayerFormField[] = definition.parameters.map(param => {
+    const field: LayerFormField = {
+      key: param.key,
+      label: param.label,
+      type: param.type,
+      options: param.options,
+      min: param.validation?.min,
+      max: param.validation?.max,
+      default: param.default,
+      validation: param.validation
+    }
+
+    // Convert conditional logic from new system to old function format
+    if (param.conditional?.showWhen) {
+      field.show = (params: Record<string, LayerParamValue>) => {
+        return Object.entries(param.conditional!.showWhen!).every(([paramKey, allowedValues]) => {
+          const currentValue = String(params[paramKey] || '')
+          if (Array.isArray(allowedValues)) {
+            return allowedValues.includes(currentValue)
+          }
+          return allowedValues === currentValue
+        })
+      }
+    }
+
+    return field
+  })
+  
+  // Add multiplier parameter for layers that support it
+  if (definition.supportsMultiplier) {
+    formSpec.push({
+      key: 'multiplier',
+      label: 'Multiplier',
+      type: 'number',
+      default: 1,
+      min: 1,
+      max: 10,
+      validation: { min: 1, max: 10 }
+    })
+  }
+  
+  return formSpec
+}
 
 /**
  * Get layer categories with their associated layers
