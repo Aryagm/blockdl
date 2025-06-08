@@ -9,12 +9,11 @@ import { Trash2 } from 'lucide-react'
 import { 
   getLayerDef, 
   getDefaultParams, 
-  getLayerIcon,
-  getLayerCategoryColors,
-  getParameterDisplayValues, 
-  getTotalParameterCount 
-} from '../lib/layer-definitions'
-import type { LayerParamValue, LayerFormField } from '../lib/layer-definitions'
+  getLayerIcon
+} from '../lib/layer-compatibility'
+import { getLayerCategoryColors } from '../lib/layer-categories'
+import { getParameterDisplayValues, getTotalParameterCount } from '../lib/layer-display'
+import type { LayerParamValue, LayerFormField } from '../lib/layer-compatibility'
 
 interface LayerNodeData {
   type: string

@@ -3,7 +3,8 @@
  */
 
 import type { DAGResult, LayerObject } from './dag-parser'
-import { generateLayerCode, getUsedKerasImports, computeInputShape } from './layer-definitions'
+import { generateLayerCode, getUsedKerasImports } from './layer-compatibility'
+import { getLayerDefinition } from './layer-definitions'
 
 /**
  * Common compilation and summary code for both Sequential and Functional API
@@ -210,6 +211,23 @@ function findTerminalNodes(orderedNodes: LayerObject[], edgeMap: Map<string, str
   }
   
   return { inputVars, outputVars }
+}
+
+/**
+ * Helper function to compute Input layer shape for code generation
+ */
+async function computeInputShape(params: Record<string, unknown>): Promise<string> {
+  const layerDef = getLayerDefinition('Input')
+  if (!layerDef) {
+    return '(784,)'
+  }
+  
+  const shape = layerDef.computeShape([], params)
+  if (!shape) {
+    return '(784,)'
+  }
+  
+  return `(${shape.join(', ')})`
 }
 
 /**
