@@ -80,38 +80,6 @@ export interface LayerDefinition {
   supportsActivation?: boolean
 }
 
-// Form field configuration for layer parameter editing (legacy format)
-export interface LayerFormField {
-  key: string
-  label: string
-  type: 'number' | 'text' | 'select' | 'boolean'
-  options?: { value: string; label: string; description?: string }[]
-  min?: number
-  max?: number
-  step?: number
-  default?: string | number | boolean
-  validation?: {
-    min?: number
-    max?: number
-    required?: boolean
-    pattern?: string
-  }
-  show?: (params: Record<string, LayerParamValue>) => boolean
-}
-
-// Complete layer definition with metadata and configuration (legacy format)
-export interface LayerDef {
-  type: string
-  icon: string
-  description: string
-  category: string
-  defaultParams: Record<string, LayerParamValue>
-  formSpec: LayerFormField[]
-  codeGen: (params: Record<string, LayerParamValue>) => string
-  supportsMultiplier?: boolean
-  supportsActivation?: boolean
-}
-
 // ============================================================================
 // NEW LAYER DEFINITIONS (Main SYSTEM)
 // ============================================================================
@@ -858,129 +826,25 @@ export function getLayersByCategory(category: string): Array<{ type: string; def
 }
 
 // ============================================================================
-// LEGACY COMPATIBILITY FUNCTIONS
+// LAYER ACCESS FUNCTIONS  
 // ============================================================================
-
-/** Runtime registry of all loaded layer definitions */
-export const layerDefs: Record<string, LayerDef> = {}
-
-/**
- * Populate layerDefs from new system
- */
-function initializeLayerDefs() {
-  Object.entries(layerDefinitions).forEach(([type, definition]) => {
-    const formSpec: LayerFormField[] = definition.parameters.map(param => {
-      const field: LayerFormField = {
-        key: param.key,
-        label: param.label,
-        type: param.type,
-        options: param.options,
-        min: param.validation?.min,
-        max: param.validation?.max,
-        default: param.default,
-        validation: param.validation
-      }
-
-      // Convert conditional logic from new system to old function format
-      if (param.conditional?.showWhen) {
-        field.show = (params: Record<string, LayerParamValue>) => {
-          return Object.entries(param.conditional!.showWhen!).every(([paramKey, allowedValues]) => {
-            const currentValue = String(params[paramKey] || '')
-            if (Array.isArray(allowedValues)) {
-              return allowedValues.includes(currentValue)
-            }
-            return allowedValues === currentValue
-          })
-        }
-      }
-
-      return field
-    })
-
-    // Add multiplier parameter for layers that support it
-    if (definition.supportsMultiplier) {
-      formSpec.push({
-        key: 'multiplier',
-        label: 'Multiplier',
-        type: 'number',
-        default: 1,
-        validation: { min: 1, max: 20 }
-      })
-    }
-
-    const defaultParams: Record<string, LayerParamValue> = {}
-    definition.parameters.forEach(param => {
-      if (param.default !== undefined) {
-        defaultParams[param.key] = param.default
-      }
-    })
-
-    // Add multiplier default for layers that support it
-    if (definition.supportsMultiplier) {
-      defaultParams.multiplier = 1
-    }
-
-    layerDefs[type] = {
-      type,
-      icon: definition.metadata.icon,
-      description: definition.metadata.description,
-      category: definition.metadata.category,
-      defaultParams,
-      formSpec,
-      codeGen: (params) => {
-        const baseCode = definition.generateCode.keras(params)
-        const multiplier = Number(params.multiplier) || 1
-        
-        if (multiplier > 1 && definition.supportsMultiplier) {
-          if (multiplier >= 5) {
-            // High multiplier case - use spread syntax with range for readability
-            return `# Repeated ${multiplier} times\n    *[${baseCode} for _ in range(${multiplier})]`
-          } else {
-            // Low multiplier case - list individual layers
-            return Array(multiplier).fill(baseCode).join(',\n    ')
-          }
-        }
-        
-        return baseCode
-      },
-      supportsMultiplier: definition.supportsMultiplier,
-      supportsActivation: definition.supportsActivation
-    }
-  })
-}
-
-// Initialize on module load
-initializeLayerDefs()
-
-/**
- * Get layer definition by type (legacy compatibility)
- */
-export function getLayerDef(type: string): LayerDef | undefined {
-  return layerDefs[type]
-}
-
-/**
- * Get default parameters for a layer type
- */
-export function getDefaultParams(type: string): Record<string, LayerParamValue> {
-  return layerDefs[type]?.defaultParams || {}
-}
 
 /**
  * Get icon for a layer type
  */
 export function getLayerIcon(type: string): string {
-  return layerDefs[type]?.icon || '🔧'
+  const definition = layerDefinitions[type]
+  return definition?.metadata.icon || '🔧'
 }
 
 /**
  * Get all available layer types with basic metadata
  */
 export function getLayerTypes(): Array<{ type: string; icon: string; description: string }> {
-  return Object.entries(layerDefs).map(([type, def]) => ({
+  return Object.entries(layerDefinitions).map(([type, definition]) => ({
     type,
-    icon: def.icon,
-    description: def.description
+    icon: definition.metadata.icon,
+    description: definition.metadata.description
   }))
 }
 
@@ -988,25 +852,25 @@ export function getLayerTypes(): Array<{ type: string; icon: string; description
  * Generate Keras code for a layer with given parameters
  */
 export function generateLayerCode(type: string, params: Record<string, LayerParamValue>): string {
-  const layerDef = layerDefs[type]
-  if (!layerDef) {
+  const definition = layerDefinitions[type]
+  if (!definition) {
     return `# Unknown layer type: ${type}`
   }
-  return layerDef.codeGen(params)
-}
-
-/**
- * Get required Keras imports for a layer type
- */
-export function getKerasImports(layerType: string): string[] {
-  const layerDef = layerDefs[layerType]
-  if (!layerDef) {
-    return []
+  
+  const baseCode = definition.generateCode.keras(params)
+  const multiplier = Number(params.multiplier) || 1
+  
+  if (multiplier > 1 && definition.supportsMultiplier) {
+    if (multiplier >= 5) {
+      // High multiplier case - use spread syntax with range for readability
+      return `# Repeated ${multiplier} times\n    *[${baseCode} for _ in range(${multiplier})]`
+    } else {
+      // Low multiplier case - list individual layers
+      return Array(multiplier).fill(baseCode).join(',\n    ')
+    }
   }
-  const imports = new Set<string>()
-  // Add import based on layer type
-  imports.add(layerType)
-  return Array.from(imports)
+  
+  return baseCode
 }
 
 /**
@@ -1027,57 +891,6 @@ export function getUsedKerasImports(layerTypes: string[]): string[] {
 }
 
 import { categories, getCategoryColorsByKey } from './categories'
-
-/**
- * Get form specification for a layer type (legacy compatibility)
- */
-export function getLayerFormSpec(layerType: string): LayerFormField[] {
-  const definition = layerDefinitions[layerType]
-  if (!definition) return []
-  
-  const formSpec: LayerFormField[] = definition.parameters.map(param => {
-    const field: LayerFormField = {
-      key: param.key,
-      label: param.label,
-      type: param.type,
-      options: param.options,
-      min: param.validation?.min,
-      max: param.validation?.max,
-      default: param.default,
-      validation: param.validation
-    }
-
-    // Convert conditional logic from new system to old function format
-    if (param.conditional?.showWhen) {
-      field.show = (params: Record<string, LayerParamValue>) => {
-        return Object.entries(param.conditional!.showWhen!).every(([paramKey, allowedValues]) => {
-          const currentValue = String(params[paramKey] || '')
-          if (Array.isArray(allowedValues)) {
-            return allowedValues.includes(currentValue)
-          }
-          return allowedValues === currentValue
-        })
-      }
-    }
-
-    return field
-  })
-  
-  // Add multiplier parameter for layers that support it
-  if (definition.supportsMultiplier) {
-    formSpec.push({
-      key: 'multiplier',
-      label: 'Multiplier',
-      type: 'number',
-      default: 1,
-      min: 1,
-      max: 10,
-      validation: { min: 1, max: 10 }
-    })
-  }
-  
-  return formSpec
-}
 
 /**
  * Get layer categories with their associated layers
