@@ -19,6 +19,10 @@ interface FlowState {
   updateShapeErrors: () => Promise<void>
 }
 
+// Constants for configuration
+const SHAPE_UPDATE_DEBOUNCE_MS = 100
+const DEFAULT_INPUT_SHAPE = '(224, 224, 3)'
+
 // Debouncing utility for shape error updates
 let shapeUpdateTimeout: NodeJS.Timeout | null = null
 
@@ -29,7 +33,65 @@ const scheduleShapeUpdate = (updateFn: () => Promise<void>) => {
   shapeUpdateTimeout = setTimeout(() => {
     updateFn()
     shapeUpdateTimeout = null
-  }, 100) // Debounce rapid updates
+  }, SHAPE_UPDATE_DEBOUNCE_MS)
+}
+
+/**
+ * Helper function to compute input shape from Input node
+ */
+const getInputShape = (nodes: Node[]): string => {
+  const inputNode = nodes.find(node => node.data.type === 'Input')
+  
+  if (!inputNode?.data.params) {
+    return DEFAULT_INPUT_SHAPE
+  }
+  
+  const params = inputNode.data.params as Record<string, unknown>
+  const inputLayerDef = getLayerDefinition('Input')
+  
+  if (inputLayerDef) {
+    const computedShape = inputLayerDef.computeShape([], params)
+    if (computedShape) {
+      return `(${computedShape.join(', ')})`
+    }
+  }
+  
+  // Legacy fallback
+  if (params.shape && typeof params.shape === 'string') {
+    return params.shape
+  }
+  
+  return DEFAULT_INPUT_SHAPE
+}
+
+/**
+ * Helper function to update nodes with error information
+ */
+const updateNodesWithErrors = (
+  nodes: Node[], 
+  errorMap: Map<string, string>
+): { nodes: Node[], hasChanges: boolean } => {
+  let hasChanges = false
+  
+  const updatedNodes = nodes.map(node => {
+    const hasError = errorMap.has(node.id)
+    const errorMessage = errorMap.get(node.id)
+    
+    if (node.data.hasShapeError !== hasError || node.data.shapeErrorMessage !== errorMessage) {
+      hasChanges = true
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          hasShapeError: hasError,
+          shapeErrorMessage: errorMessage
+        }
+      }
+    }
+    return node
+  })
+  
+  return { nodes: updatedNodes, hasChanges }
 }
 
 export const useFlowStore = create<FlowState>((set, get) => ({
@@ -88,55 +150,20 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
     
     try {
-      // Find the input node to determine the input shape
-      const inputNode = nodes.find(node => node.data.type === 'Input')
-      let inputShape = '(224, 224, 3)' // Default fallback shape
-      
-      if (inputNode?.data.params) {
-        const params = inputNode.data.params as Record<string, string | number | boolean>
-        // Use new layer definitions system for Input layer shape computation
-        const inputLayerDef = getLayerDefinition('Input')
-        if (inputLayerDef) {
-          const computedShape = inputLayerDef.computeShape([], params)
-          if (computedShape) {
-            // Convert shape array to string format
-            inputShape = `(${computedShape.join(', ')})`
-          } else if (params.shape) {
-            // Legacy fallback - convert to string
-            inputShape = String(params.shape);
-          }
-        }
-      }
-      
-      // Parse the graph into a DAG
+      const inputShape = getInputShape(nodes)
       const dagResult = parseGraphToDAG(nodes, edges)
       
       if (!dagResult.isValid) {
+        // For DAG errors, mark all nodes as having graph-level errors
         const errorMap = new Map<string, string>()
-        dagResult.errors.forEach(error => {
-          errorMap.set('graph', error)
+        const firstError = dagResult.errors[0] || 'Invalid graph structure'
+        
+        // Apply error to all nodes for visibility
+        nodes.forEach(node => {
+          errorMap.set(node.id, firstError)
         })
         
-        // Update nodes with error information
-        let hasChanges = false
-        const updatedNodes = nodes.map(node => {
-          const hasError = errorMap.has('graph')
-          const errorMessage = errorMap.get('graph')
-          
-          if (node.data.hasShapeError !== hasError || node.data.shapeErrorMessage !== errorMessage) {
-            hasChanges = true
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                hasShapeError: hasError,
-                shapeErrorMessage: errorMessage
-              }
-            }
-          }
-          return node
-        })
-        
+        const { nodes: updatedNodes, hasChanges } = updateNodesWithErrors(nodes, errorMap)
         if (hasChanges) {
           set({ nodes: updatedNodes })
         }
@@ -147,31 +174,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       const { errors } = await computeShapes(dagResult, inputShape)
       const errorMap = new Map<string, string>()
       
-      errors.forEach((error: { nodeId: string; message: string }) => {
+      errors.forEach(error => {
         errorMap.set(error.nodeId, error.message)
       })
       
-      // Update nodes with error information - optimize comparison
-      let hasChanges = false
-      const updatedNodes = nodes.map(node => {
-        const hasError = errorMap.has(node.id)
-        const errorMessage = errorMap.get(node.id)
-        
-        if (node.data.hasShapeError !== hasError || node.data.shapeErrorMessage !== errorMessage) {
-          hasChanges = true
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              hasShapeError: hasError,
-              shapeErrorMessage: errorMessage
-            }
-          }
-        }
-        return node
-      })
-      
-      // Only update state if there are actual changes
+      const { nodes: updatedNodes, hasChanges } = updateNodesWithErrors(nodes, errorMap)
       if (hasChanges) {
         set({ nodes: updatedNodes })
       }
