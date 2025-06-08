@@ -172,15 +172,17 @@ export function LayerNode({ id, data }: LayerNodeProps) {
               </div>
               
               {visibleParams.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {visibleParams.slice(0, 3).map((param, index) => (
-                    <span key={index} className="text-xs text-slate-600 bg-white/70 px-2 py-0.5 rounded-md">
-                      {param}
-                    </span>
-                  ))}
+                <div className="flex gap-1 mt-2 overflow-hidden">
+                  <div className="flex gap-1 flex-1 min-w-0">
+                    {visibleParams.slice(0, showMoreIndicator ? 2 : 3).map((param, index) => (
+                      <span key={index} className="text-xs text-slate-600 bg-white/70 px-2 py-0.5 rounded-md truncate flex-shrink-0 max-w-[80px]" title={param}>
+                        {param}
+                      </span>
+                    ))}
+                  </div>
                   {showMoreIndicator && (
-                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md font-medium">
-                      +{totalParams - 3} more
+                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md font-medium flex-shrink-0">
+                      +{totalParams - 2} more
                     </span>
                   )}
                 </div>

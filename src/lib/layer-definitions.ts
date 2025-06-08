@@ -13,6 +13,23 @@
 import { parseTupleOrNumber } from './utils'
 
 // ============================================================================
+// ACTIVATION CONSTANTS
+// ============================================================================
+
+/**
+ * Unified activation function options used across all layers
+ */
+export const ACTIVATION_OPTIONS: SelectOption[] = [
+  { value: 'linear', label: 'Linear (None)', description: 'No activation function' },
+  { value: 'relu', label: 'ReLU', description: 'Rectified Linear Unit' },
+  { value: 'sigmoid', label: 'Sigmoid', description: 'Sigmoid function' },
+  { value: 'tanh', label: 'Tanh', description: 'Hyperbolic Tangent' },
+  { value: 'softmax', label: 'Softmax', description: 'For probability distributions' },
+  { value: 'leaky_relu', label: 'Leaky ReLU', description: 'Leaky Rectified Linear Unit' },
+  { value: 'elu', label: 'ELU', description: 'Exponential Linear Unit' }
+]
+
+// ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
@@ -66,8 +83,6 @@ export interface LayerMetadata {
 
 export interface CodeGenerator {
   keras: (params: Record<string, unknown>) => string
-  pytorch?: (params: Record<string, unknown>) => string
-  onnx?: (params: Record<string, unknown>) => string
 }
 
 export interface LayerDefinition {
@@ -374,13 +389,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         label: 'Activation',
         description: 'Activation function to use',
         default: 'linear',
-        options: [
-          { value: 'linear', label: 'Linear (None)', description: 'No activation function' },
-          { value: 'relu', label: 'ReLU', description: 'Rectified Linear Unit' },
-          { value: 'sigmoid', label: 'Sigmoid', description: 'Sigmoid function' },
-          { value: 'tanh', label: 'Tanh', description: 'Hyperbolic Tangent' },
-          { value: 'softmax', label: 'Softmax', description: 'For probability distributions' }
-        ]
+        options: ACTIVATION_OPTIONS
       }
     ],
     validateInputs: (inputShapes: number[][]) => {
@@ -414,10 +423,6 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         } else {
           return `Dense(${units}, activation='${activation}')`
         }
-      },
-      pytorch: (params: Record<string, unknown>) => {
-        const units = Number(params.units) || 128
-        return `nn.Linear(in_features, ${units})`
       }
     },
     supportsMultiplier: true,
@@ -476,6 +481,14 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
           { value: 'valid', label: 'Valid', description: 'No padding, output size reduced' },
           { value: 'same', label: 'Same', description: 'Padding to keep same output size' }
         ]
+      },
+      {
+        key: 'activation',
+        type: 'select',
+        label: 'Activation',
+        description: 'Activation function to use',
+        default: 'linear',
+        options: ACTIVATION_OPTIONS
       }
     ],
     validateInputs: (inputShapes, params) => {
@@ -521,25 +534,131 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         const kernelSize = String(params.kernel_size) || '(3,3)'
         const strides = String(params.strides) || '(1,1)'
         const padding = String(params.padding) || 'same'
+        const activation = String(params.activation) || 'linear'
         
-        return `Conv2D(${filters}, kernel_size=${kernelSize}, strides=${strides}, padding='${padding}')`
-      },
-      pytorch: (params) => {
-        const filters = Number(params.filters) || 32
-        const kernelSizeStr = String(params.kernel_size) || '(3,3)'
-        const stridesStr = String(params.strides) || '(1,1)'
-        const padding = String(params.padding) || 'same'
-        
-        // Parse kernel size and strides for PyTorch format
-        const kernelSize = parseTupleOrNumber(kernelSizeStr)
-        const strides = parseTupleOrNumber(stridesStr)
-        
-        if (!kernelSize || !strides) {
-          return `nn.Conv2d(in_channels, ${filters}, kernel_size=3)`
+        let code = `Conv2D(${filters}, kernel_size=${kernelSize}, strides=${strides}, padding='${padding}'`
+        if (activation !== 'linear') {
+          code += `, activation='${activation}'`
         }
+        code += ')'
         
-        const paddingValue = padding === 'same' ? 'same' : '0'
-        return `nn.Conv2d(in_channels, ${filters}, kernel_size=${kernelSize[0]}, stride=${strides[0]}, padding='${paddingValue}')`
+        return code
+      }
+    },
+    supportsMultiplier: true,
+    supportsActivation: true
+  },
+
+  Conv1D: {
+    metadata: {
+      category: 'convolutional',
+      icon: '📏',
+      description: '1D convolution layer for sequence data',
+      tags: ['convolution', 'cnn', '1d', 'sequence'],
+      performance: {
+        complexity: 'O(L*C*F*K) where L=sequence length, C=input channels, F=filters, K=kernel size',
+        memory: 'Moderate, depends on filter count',
+        usage: 'Feature extraction from sequential data like time series or text'
+      }
+    },
+    parameters: [
+      {
+        key: 'filters',
+        type: 'number',
+        label: 'Filters',
+        description: 'Number of output filters/feature maps',
+        default: 32,
+        validation: { min: 1, max: 1024, required: true },
+        ui: { tooltip: 'More filters = more features detected' }
+      },
+      {
+        key: 'kernel_size',
+        type: 'number',
+        label: 'Kernel Size',
+        description: 'Size of 1D convolution window',
+        default: 3,
+        validation: { min: 1, max: 100, required: true },
+        ui: { tooltip: 'e.g., 3 for analyzing 3 consecutive time steps' }
+      },
+      {
+        key: 'strides',
+        type: 'number',
+        label: 'Strides',
+        description: 'Stride of convolution',
+        default: 1,
+        validation: { min: 1, max: 10 }
+      },
+      {
+        key: 'padding',
+        type: 'select',
+        label: 'Padding',
+        description: 'Padding strategy',
+        default: 'same',
+        options: [
+          { value: 'valid', label: 'Valid', description: 'No padding, output length reduced' },
+          { value: 'same', label: 'Same', description: 'Padding to keep same output length' }
+        ]
+      },
+      {
+        key: 'activation',
+        type: 'select',
+        label: 'Activation',
+        description: 'Activation function to use',
+        default: 'linear',
+        options: ACTIVATION_OPTIONS
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'Conv1D layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 2) {
+        return { isValid: false, errorMessage: 'Conv1D layer requires 2D input (sequence_length, features)' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes, params) => {
+      if (inputShapes.length !== 1) return null
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 2) return null
+      
+      const [inputLength] = inputShape
+      const filters = Number(params.filters) || 32
+      const kernelSize = Number(params.kernel_size) || 3
+      const strides = Number(params.strides) || 1
+      const padding = String(params.padding) || 'same'
+      
+      let outputLength: number
+      
+      if (padding === 'same') {
+        outputLength = Math.ceil(inputLength / strides)
+      } else {
+        outputLength = Math.floor((inputLength - kernelSize) / strides) + 1
+      }
+      
+      return [outputLength, filters]
+    },
+    generateCode: {
+      keras: (params) => {
+        const filters = Number(params.filters) || 32
+        const kernelSize = Number(params.kernel_size) || 3
+        const strides = Number(params.strides) || 1
+        const padding = String(params.padding) || 'same'
+        const activation = String(params.activation) || 'linear'
+        
+        let code = `Conv1D(${filters}, kernel_size=${kernelSize}`
+        if (strides !== 1) {
+          code += `, strides=${strides}`
+        }
+        code += `, padding='${padding}'`
+        if (activation !== 'linear') {
+          code += `, activation='${activation}'`
+        }
+        code += ')'
+        
+        return code
       }
     },
     supportsMultiplier: true,
@@ -636,18 +755,6 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         const padding = String(params.padding) || 'valid'
         
         return `MaxPool2D(pool_size=${poolSize}${strides}, padding='${padding}')`
-      },
-      pytorch: (params) => {
-        const poolSizeStr = String(params.pool_size) || '(2,2)'
-        const poolSize = parseTupleOrNumber(poolSizeStr)
-        const stridesStr = String(params.strides) || poolSizeStr
-        const strides = parseTupleOrNumber(stridesStr)
-        
-        if (!poolSize || !strides) {
-          return 'nn.MaxPool2d(kernel_size=2)'
-        }
-        
-        return `nn.MaxPool2d(kernel_size=${poolSize[0]}, stride=${strides[0]})`
       }
     }
   },
@@ -681,8 +788,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       return [inputShape.reduce((acc, dim) => acc * dim, 1)]
     },
     generateCode: {
-      keras: () => 'Flatten()',
-      pytorch: () => 'nn.Flatten()'
+      keras: () => 'Flatten()'
     }
   },
 
@@ -709,13 +815,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         description: 'Type of activation function',
         default: 'relu',
         validation: { required: true },
-        options: [
-          { value: 'relu', label: 'ReLU', description: 'Rectified Linear Unit' },
-          { value: 'sigmoid', label: 'Sigmoid', description: 'Sigmoid function' },
-          { value: 'tanh', label: 'Tanh', description: 'Hyperbolic Tangent' },
-          { value: 'softmax', label: 'Softmax', description: 'For probability distributions' },
-          { value: 'linear', label: 'Linear', description: 'Linear activation' }
-        ]
+        options: ACTIVATION_OPTIONS
       }
     ],
     validateInputs: (inputShapes, params) => {
@@ -733,17 +833,6 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       keras: (params) => {
         const activation = String(params.activation_function) || 'relu'
         return `Activation('${activation}')`
-      },
-      pytorch: (params) => {
-        const activation = String(params.activation_function) || 'relu'
-        const activationMap: Record<string, string> = {
-          'relu': 'nn.ReLU()',
-          'sigmoid': 'nn.Sigmoid()',
-          'tanh': 'nn.Tanh()',
-          'softmax': 'nn.Softmax(dim=1)',
-          'linear': 'nn.Identity()'
-        }
-        return activationMap[activation] || 'nn.ReLU()'
       }
     }
   },
@@ -789,10 +878,6 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       keras: (params) => {
         const rate = Number(params.rate) || 0.5
         return `Dropout(${rate})`
-      },
-      pytorch: (params) => {
-        const rate = Number(params.rate) || 0.5
-        return `nn.Dropout(p=${rate})`
       }
     }
   }

@@ -175,6 +175,7 @@ export function getLayerCategoryColors(layerType: string): { bg: string; border:
     'Output': 'input_output',
     'Dense': 'core',
     'Conv2D': 'convolutional',
+    'Conv1D': 'convolutional',
     'MaxPool2D': 'pooling',
     'Flatten': 'transformation',
     'Activation': 'core',
