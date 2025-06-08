@@ -951,18 +951,82 @@ export function getLayersByCategory(category: string): Array<{ type: string; def
 }
 
 /**
+ * Static color mapping to ensure Tailwind classes are included in build
+ */
+const categoryColorMap: Record<string, { bg: string; border: string; text: string; hover: string }> = {
+  emerald: {
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-200',
+    text: 'text-emerald-700',
+    hover: 'hover:border-emerald-300 hover:shadow-emerald-200/50'
+  },
+  blue: {
+    bg: 'bg-blue-50',
+    border: 'border-blue-200',
+    text: 'text-blue-700',
+    hover: 'hover:border-blue-300 hover:shadow-blue-200/50'
+  },
+  purple: {
+    bg: 'bg-purple-50',
+    border: 'border-purple-200',
+    text: 'text-purple-700',
+    hover: 'hover:border-purple-300 hover:shadow-purple-200/50'
+  },
+  indigo: {
+    bg: 'bg-indigo-50',
+    border: 'border-indigo-200',
+    text: 'text-indigo-700',
+    hover: 'hover:border-indigo-300 hover:shadow-indigo-200/50'
+  },
+  amber: {
+    bg: 'bg-amber-50',
+    border: 'border-amber-200',
+    text: 'text-amber-700',
+    hover: 'hover:border-amber-300 hover:shadow-amber-200/50'
+  },
+  orange: {
+    bg: 'bg-orange-50',
+    border: 'border-orange-200',
+    text: 'text-orange-700',
+    hover: 'hover:border-orange-300 hover:shadow-orange-200/50'
+  },
+  rose: {
+    bg: 'bg-rose-50',
+    border: 'border-rose-200',
+    text: 'text-rose-700',
+    hover: 'hover:border-rose-300 hover:shadow-rose-200/50'
+  },
+  cyan: {
+    bg: 'bg-cyan-50',
+    border: 'border-cyan-200',
+    text: 'text-cyan-700',
+    hover: 'hover:border-cyan-300 hover:shadow-cyan-200/50'
+  },
+  teal: {
+    bg: 'bg-teal-50',
+    border: 'border-teal-200',
+    text: 'text-teal-700',
+    hover: 'hover:border-teal-300 hover:shadow-teal-200/50'
+  }
+}
+
+/**
  * Get category information with layer types
  */
 export function getCategoriesWithLayers() {
-  const categoriesWithLayers = Object.entries(categories).map(([key, category]) => ({
-    name: category.name,
-    color: category.color,
-    bgColor: `bg-${category.color}-50`,
-    borderColor: `border-${category.color}-200`,
-    textColor: `text-${category.color}-700`,
-    description: category.description,
-    layerTypes: getLayersByCategory(key).map(({ type }) => type)
-  }))
+  const categoriesWithLayers = Object.entries(categories).map(([key, category]) => {
+    const colorClasses = categoryColorMap[category.color] || categoryColorMap.blue // fallback to blue
+    
+    return {
+      name: category.name,
+      color: category.color,
+      bgColor: colorClasses.bg,
+      borderColor: colorClasses.border,
+      textColor: colorClasses.text,
+      description: category.description,
+      layerTypes: getLayersByCategory(key).map(({ type }) => type)
+    }
+  })
   
   return categoriesWithLayers
 }

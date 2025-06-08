@@ -10,6 +10,55 @@ import { getLayerDef, getDefaultParams, getLayerIcon } from '../lib/layer-defs'
 import { categories } from '../lib/layer-definitions'
 import { getParameterDisplayValues, getTotalParameterCount } from '../lib/parameter-display'
 
+// Static color mapping to ensure Tailwind classes are included in build
+const categoryColorMap: Record<string, { bg: string; border: string; hover: string }> = {
+  emerald: {
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-200',
+    hover: 'hover:border-emerald-300 hover:shadow-emerald-200/50'
+  },
+  blue: {
+    bg: 'bg-blue-50',
+    border: 'border-blue-200',
+    hover: 'hover:border-blue-300 hover:shadow-blue-200/50'
+  },
+  purple: {
+    bg: 'bg-purple-50',
+    border: 'border-purple-200',
+    hover: 'hover:border-purple-300 hover:shadow-purple-200/50'
+  },
+  indigo: {
+    bg: 'bg-indigo-50',
+    border: 'border-indigo-200',
+    hover: 'hover:border-indigo-300 hover:shadow-indigo-200/50'
+  },
+  amber: {
+    bg: 'bg-amber-50',
+    border: 'border-amber-200',
+    hover: 'hover:border-amber-300 hover:shadow-amber-200/50'
+  },
+  orange: {
+    bg: 'bg-orange-50',
+    border: 'border-orange-200',
+    hover: 'hover:border-orange-300 hover:shadow-orange-200/50'
+  },
+  rose: {
+    bg: 'bg-rose-50',
+    border: 'border-rose-200',
+    hover: 'hover:border-rose-300 hover:shadow-rose-200/50'
+  },
+  cyan: {
+    bg: 'bg-cyan-50',
+    border: 'border-cyan-200',
+    hover: 'hover:border-cyan-300 hover:shadow-cyan-200/50'
+  },
+  teal: {
+    bg: 'bg-teal-50',
+    border: 'border-teal-200',
+    hover: 'hover:border-teal-300 hover:shadow-teal-200/50'
+  }
+}
+
 // Dynamic layer category color mapping from new TypeScript system
 const getLayerCategoryColor = (layerType: string) => {
   try {
@@ -18,11 +67,9 @@ const getLayerCategoryColor = (layerType: string) => {
     const category = categories[categoryKey as keyof typeof categories]
     
     if (category) {
-      const baseColor = category.color
-      return {
-        bg: `bg-${baseColor}-50`,
-        border: `border-${baseColor}-200`,
-        hover: `hover:border-${baseColor}-300 hover:shadow-${baseColor}-200/50`
+      const colorClasses = categoryColorMap[category.color]
+      if (colorClasses) {
+        return colorClasses
       }
     }
   } catch (error) {
