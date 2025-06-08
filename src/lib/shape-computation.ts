@@ -3,7 +3,7 @@
  */
 
 import type { LayerObject } from './dag-parser'
-import { getLayerDefinition } from './layer-definitions'
+import { getLayerDefinition } from './layers/definitions'
 import { parseShape } from './utils'
 
 export interface ShapeError {

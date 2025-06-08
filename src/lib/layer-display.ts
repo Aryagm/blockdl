@@ -4,9 +4,9 @@
  * Functions for formatting and displaying layer parameters in the UI.
  */
 
-import type { LayerParamValue } from './layer-definitions'
-import { getLayerDef } from './layer-definitions'
-import { getLayerDefinition } from './layer-definitions'
+import type { LayerParamValue } from './layers/parameters'
+import { getLayerDefinition } from './layers/definitions'
+import { getLayerFormSpec } from './layers/parameters'
 
 // ============================================================================
 // PARAMETER DISPLAY UTILITIES
@@ -16,7 +16,7 @@ import { getLayerDefinition } from './layer-definitions'
  * Generate visible parameter display strings for layer visualization
  */
 export function getParameterDisplayValues(layerType: string, params: Record<string, LayerParamValue>): string[] {
-  const layerDef = getLayerDef(layerType)
+  const layerDef = getLayerDefinition(layerType)
   if (!layerDef) return []
 
   // Special handling for Input layers
@@ -41,8 +41,8 @@ export function getParameterDisplayValues(layerType: string, params: Record<stri
  * Get the total number of configurable parameters for a layer
  */
 export function getTotalParameterCount(layerType: string): number {
-  const layerDef = getLayerDef(layerType)
-  return layerDef?.formSpec.length || 0
+  const formSpec = getLayerFormSpec(layerType)
+  return formSpec.length || 0
 }
 
 // ============================================================================

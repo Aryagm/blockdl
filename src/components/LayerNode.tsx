@@ -6,14 +6,12 @@ import { Label } from './ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Button } from './ui/button'
 import { Trash2 } from 'lucide-react'
-import {
-  getLayerDef,
-  getDefaultParams, 
-  getLayerIcon
-} from '../lib/layer-definitions'
-import { getLayerCategoryColors } from '../lib/layer-categories'
+import { getDefaultParams, getLayerFormSpec } from '../lib/layers/parameters'
+import { getLayerCategoryColors } from '../lib/categories'
+import { getLayerIcon } from '../lib/layers/definitions'
 import { getParameterDisplayValues, getTotalParameterCount } from '../lib/layer-display'
-import type { LayerParamValue, LayerFormField } from '../lib/layer-definitions'
+import type { LayerParamValue } from '../lib/layers/parameters'
+import type { LayerFormField } from '../lib/layers/parameters'
 
 interface LayerNodeData {
   type: string
@@ -33,7 +31,7 @@ export function LayerNode({ id, data }: LayerNodeProps) {
   const [editParams, setEditParams] = useState(params)
   const { updateNodeData, deleteElements } = useReactFlow()
   
-  const layerDef = getLayerDef(type)
+  const formSpec = getLayerFormSpec(type)
   const icon = getLayerIcon(type)
   const categoryColors = getLayerCategoryColors(type)
   const visibleParams = getParameterDisplayValues(type, params)
@@ -210,7 +208,7 @@ export function LayerNode({ id, data }: LayerNodeProps) {
             </div>
             
             <div className="space-y-3">
-              {layerDef?.formSpec.map(renderParamEditor)}
+              {formSpec.map(renderParamEditor)}
             </div>
             
             <div className="flex gap-2">

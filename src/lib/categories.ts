@@ -1,14 +1,17 @@
 /**
  * Layer Category Definitions and Color Mappings
  * 
+ * Single source of truth for layer categorization and theming.
  * Defines the visual categorization and theming for different types of neural network layers.
  */
+
+import { getLayersByCategory } from './layers/definitions'
 
 // ============================================================================
 // CATEGORY DEFINITIONS
 // ============================================================================
 
-export const categories = {
+export const categories: Record<string, CategoryDefinition> = {
   input_output: {
     name: 'Input/Output',
     color: 'emerald',
@@ -130,6 +133,23 @@ const categoryColorMap: Record<string, { bg: string; border: string; text: strin
 }
 
 // ============================================================================
+// TYPES
+// ============================================================================
+
+export interface CategoryDefinition {
+  name: string
+  color: string
+  description: string
+  icon: string
+}
+
+export interface CategoryColors {
+  bg: string
+  border: string
+  text: string
+}
+
+// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
@@ -170,4 +190,24 @@ export function getCategoryColorsByKey(categoryKey: string): { bg: string; borde
   }
   
   return categoryColorMap[categoryInfo.color] || categoryColorMap.blue
+}
+
+/**
+ * Get layer categories with their associated layers
+ */
+export function getLayerCategories() {
+  return Object.entries(categories).map(([key, category]) => {
+    const colorClasses = getCategoryColorsByKey(key)
+    const layersByCategory = getLayersByCategory(key)
+    
+    return {
+      name: category.name,
+      color: category.color,
+      bgColor: colorClasses.bg,
+      borderColor: colorClasses.border,
+      textColor: colorClasses.text,
+      description: category.description,
+      layerTypes: layersByCategory.map(({ type }: { type: string }) => type)
+    }
+  })
 }

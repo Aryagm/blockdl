@@ -6,7 +6,7 @@
  */
 
 import type { Node, Edge } from '@xyflow/react'
-import type { LayerParams } from './layer-definitions'
+import type { LayerParams } from './layers/parameters'
 import graphlib from 'graphlib'
 
 export interface LayerObject {

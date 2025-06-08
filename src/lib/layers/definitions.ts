@@ -1,58 +1,19 @@
 /**
- * Unified Layer Definitions - Pure TypeScript Approach
+ * Pure Layer Definitions
  * 
- * Everything needed to define a layer is in this single file:
- * - Metadata (category, icon, description)
- * - Parameters (form fields, validation, defaults)
- * - Shape computation logic
- * - Code generation for multiple frameworks
- * 
- * To add a new layer, simply add it to the layerDefinitions object below.
+ * Contains only the core layer definitions with metadata, parameters, validation,
+ * shape computation, and code generation. This is the single source of truth
+ * for what layers exist and how they behave.
  */
 
-import { parseShape, parseTupleOrNumber } from './utils'
+import { parseShape, parseTupleOrNumber } from '../utils'
+import type { LayerParamValue } from '../layer-definitions'
 
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
 export type ParameterType = 'number' | 'text' | 'select' | 'boolean'
-
-// Legacy compatibility types
-export type LayerParamValue = string | number | boolean
-export type LayerParams = Record<string, LayerParamValue>
-
-// Form field configuration for layer parameter editing
-export interface LayerFormField {
-  key: string
-  label: string
-  type: 'number' | 'text' | 'select' | 'boolean'
-  options?: { value: string; label: string; description?: string }[]
-  min?: number
-  max?: number
-  step?: number
-  default?: string | number | boolean
-  validation?: {
-    min?: number
-    max?: number
-    required?: boolean
-    pattern?: string
-  }
-  show?: (params: Record<string, LayerParamValue>) => boolean
-}
-
-// Complete layer definition with metadata and configuration (legacy format)
-export interface LayerDef {
-  type: string
-  icon: string
-  description: string
-  category: string
-  defaultParams: Record<string, LayerParamValue>
-  formSpec: LayerFormField[]
-  codeGen: (params: Record<string, LayerParamValue>) => string
-  kerasImport?: string
-  supportsMultiplier?: boolean
-}
 
 export interface SelectOption {
   value: string
@@ -204,7 +165,6 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
     ],
     validateInputs: (inputShapes, params) => {
       // Input layers don't require input validation as they are the starting point
-      // Parameters are required by interface but not used in this implementation
       void inputShapes; // Explicitly mark as intentionally unused
       void params;      // Explicitly mark as intentionally unused
       return { isValid: true }
@@ -212,7 +172,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
     computeShape: (inputShapes, params) => {
       // Input layers determine their own shape
       void inputShapes; // Explicitly mark as intentionally unused
-      // Input layers determine their own shape
+      
       if (params.computed_shape || params.shape) {
         const shapeString = String(params.computed_shape || params.shape || '(784,)')
         return parseShape(shapeString)
@@ -898,129 +858,14 @@ export function getLayersByCategory(category: string): Array<{ type: string; def
     .map(([type, definition]) => ({ type, definition }))
 }
 
-// ============================================================================
-// LEGACY COMPATIBILITY FUNCTIONS
-// ============================================================================
-
-/** Runtime registry of all loaded layer definitions */
-export const layerDefs: Record<string, LayerDef> = {}
-
-/**
- * Populate layerDefs from new system
- */
-function initializeLayerDefs() {
-  Object.entries(layerDefinitions).forEach(([type, definition]) => {
-    const formSpec: LayerFormField[] = definition.parameters.map(param => {
-      const field: LayerFormField = {
-        key: param.key,
-        label: param.label,
-        type: param.type,
-        options: param.options,
-        min: param.validation?.min,
-        max: param.validation?.max,
-        default: param.default,
-        validation: param.validation
-      }
-
-      // Convert conditional logic from new system to old function format
-      if (param.conditional?.showWhen) {
-        field.show = (params: Record<string, LayerParamValue>) => {
-          return Object.entries(param.conditional!.showWhen!).every(([paramKey, allowedValues]) => {
-            const currentValue = String(params[paramKey] || '')
-            if (Array.isArray(allowedValues)) {
-              return allowedValues.includes(currentValue)
-            }
-            return allowedValues === currentValue
-          })
-        }
-      }
-
-      return field
-    })
-
-    // Add multiplier parameter for layers that support it
-    if (definition.supportsMultiplier) {
-      formSpec.push({
-        key: 'multiplier',
-        label: 'Multiplier',
-        type: 'number',
-        default: 1,
-        validation: { min: 1, max: 20 }
-      })
-    }
-
-    const defaultParams: Record<string, LayerParamValue> = {}
-    definition.parameters.forEach(param => {
-      if (param.default !== undefined) {
-        defaultParams[param.key] = param.default
-      }
-    })
-
-    // Add multiplier default for layers that support it
-    if (definition.supportsMultiplier) {
-      defaultParams.multiplier = 1
-    }
-
-    layerDefs[type] = {
-      type,
-      icon: definition.metadata.icon,
-      description: definition.metadata.description,
-      category: definition.metadata.category,
-      defaultParams,
-      formSpec,
-      codeGen: (params) => {
-        const baseCode = definition.generateCode.keras(params)
-        const multiplier = Number(params.multiplier) || 1
-        
-        if (multiplier > 1 && definition.supportsMultiplier) {
-          if (multiplier >= 5) {
-            // High multiplier case - use spread syntax with range for readability
-            return `# Repeated ${multiplier} times\n    *[${baseCode} for _ in range(${multiplier})]`
-          } else {
-            // Low multiplier case - list individual layers
-            return Array(multiplier).fill(baseCode).join(',\n    ')
-          }
-        }
-        
-        return baseCode
-      },
-      supportsMultiplier: definition.supportsMultiplier
-    }
-  })
-}
-
-// Initialize on module load
-initializeLayerDefs()
-
-/**
- * Get layer definition by type (legacy compatibility)
- */
-export function getLayerDef(type: string): LayerDef | undefined {
-  return layerDefs[type]
-}
-
-/**
- * Get default parameters for a layer type
- */
-export function getDefaultParams(type: string): Record<string, LayerParamValue> {
-  return layerDefs[type]?.defaultParams || {}
-}
-
-/**
- * Get icon for a layer type
- */
-export function getLayerIcon(type: string): string {
-  return layerDefs[type]?.icon || '🔧'
-}
-
 /**
  * Get all available layer types with basic metadata
  */
 export function getLayerTypes(): Array<{ type: string; icon: string; description: string }> {
-  return Object.entries(layerDefs).map(([type, def]) => ({
+  return Object.entries(layerDefinitions).map(([type, def]) => ({
     type,
-    icon: def.icon,
-    description: def.description
+    icon: def.metadata.icon,
+    description: def.metadata.description
   }))
 }
 
@@ -1028,11 +873,11 @@ export function getLayerTypes(): Array<{ type: string; icon: string; description
  * Generate Keras code for a layer with given parameters
  */
 export function generateLayerCode(type: string, params: Record<string, LayerParamValue>): string {
-  const layerDef = layerDefs[type]
+  const layerDef = layerDefinitions[type]
   if (!layerDef) {
     return `# Unknown layer type: ${type}`
   }
-  return layerDef.codeGen(params)
+  return layerDef.generateCode.keras(params)
 }
 
 /**
@@ -1052,26 +897,9 @@ export function getUsedKerasImports(layerTypes: string[]): string[] {
   return Array.from(imports)
 }
 
-import { categories, getCategoryColorsByKey } from './categories'
-
 /**
- * Get layer categories with their associated layers
+ * Get the icon for a layer type
  */
-export function getLayerCategories() {
-  return Object.entries(categories).map(([key, category]) => {
-    const colorClasses = getCategoryColorsByKey(key)
-    const layersByCategory = getLayersByCategory(key)
-    
-    return {
-      name: category.name,
-      color: category.color,
-      bgColor: colorClasses.bg,
-      borderColor: colorClasses.border,
-      textColor: colorClasses.text,
-      description: category.description,
-      layerTypes: layersByCategory.map(({ type }: { type: string }) => type)
-    }
-  })
+export function getLayerIcon(type: string): string {
+  return layerDefinitions[type]?.metadata.icon || '🔧'
 }
-
-

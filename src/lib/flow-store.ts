@@ -3,7 +3,7 @@ import { addEdge, applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
 import type { Node, Edge, NodeChange, EdgeChange, Connection } from '@xyflow/react'
 import { parseGraphToDAG } from './dag-parser'
 import { computeShapes } from './shape-computation'
-import { getLayerDefinition } from './layer-definitions'
+import { getLayerDefinition } from './layers/definitions'
 
 interface FlowState {
   nodes: Node[]

@@ -1,117 +1,15 @@
 /**
- * Unified Layer Definitions - Pure TypeScript Approach
+ * Layer Registry - Pure Layer Definitions
  * 
- * Everything needed to define a layer is in this single file:
- * - Metadata (category, icon, description)
- * - Parameters (form fields, validation, defaults)
- * - Shape computation logic
- * - Code generation for multiple frameworks
- * 
- * To add a new layer, simply add it to the layerDefinitions object below.
+ * This file contains only the layer definitions - no helper functions,
+ * no legacy compatibility, just the core layer specifications.
  */
 
-import { parseShape, parseTupleOrNumber } from './utils'
+import { LayerDefinition } from './types'
+import { parseShape, parseTupleOrNumber } from './shape-utils'
 
 // ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
-
-export type ParameterType = 'number' | 'text' | 'select' | 'boolean'
-
-// Legacy compatibility types
-export type LayerParamValue = string | number | boolean
-export type LayerParams = Record<string, LayerParamValue>
-
-// Form field configuration for layer parameter editing
-export interface LayerFormField {
-  key: string
-  label: string
-  type: 'number' | 'text' | 'select' | 'boolean'
-  options?: { value: string; label: string; description?: string }[]
-  min?: number
-  max?: number
-  step?: number
-  default?: string | number | boolean
-  validation?: {
-    min?: number
-    max?: number
-    required?: boolean
-    pattern?: string
-  }
-  show?: (params: Record<string, LayerParamValue>) => boolean
-}
-
-// Complete layer definition with metadata and configuration (legacy format)
-export interface LayerDef {
-  type: string
-  icon: string
-  description: string
-  category: string
-  defaultParams: Record<string, LayerParamValue>
-  formSpec: LayerFormField[]
-  codeGen: (params: Record<string, LayerParamValue>) => string
-  kerasImport?: string
-  supportsMultiplier?: boolean
-}
-
-export interface SelectOption {
-  value: string
-  label: string
-  description?: string
-}
-
-export interface ParameterDefinition {
-  key: string
-  type: ParameterType
-  label: string
-  description?: string
-  default?: string | number | boolean
-  validation?: {
-    min?: number
-    max?: number
-    required?: boolean
-    pattern?: string
-  }
-  options?: SelectOption[]
-  conditional?: {
-    showWhen?: Record<string, string | string[]>
-  }
-  ui?: {
-    tooltip?: string
-    group?: string
-    order?: number
-  }
-}
-
-export interface LayerMetadata {
-  category: string
-  icon: string
-  description: string
-  tags?: string[]
-  performance?: {
-    complexity?: string
-    memory?: string
-    usage?: string
-  }
-}
-
-export interface CodeGenerator {
-  keras: (params: Record<string, unknown>) => string
-  pytorch?: (params: Record<string, unknown>) => string
-  onnx?: (params: Record<string, unknown>) => string
-}
-
-export interface LayerDefinition {
-  metadata: LayerMetadata
-  parameters: ParameterDefinition[]
-  validateInputs: (inputShapes: number[][], params: Record<string, unknown>) => { isValid: boolean; errorMessage?: string }
-  computeShape: (inputShapes: number[][], params: Record<string, unknown>) => number[] | null
-  generateCode: CodeGenerator
-  supportsMultiplier?: boolean
-}
-
-// ============================================================================
-// LAYER DEFINITIONS
+// LAYER DEFINITIONS REGISTRY
 // ============================================================================
 
 export const layerDefinitions: Record<string, LayerDefinition> = {
@@ -203,16 +101,13 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       }
     ],
     validateInputs: (inputShapes, params) => {
-      // Input layers don't require input validation as they are the starting point
-      // Parameters are required by interface but not used in this implementation
-      void inputShapes; // Explicitly mark as intentionally unused
-      void params;      // Explicitly mark as intentionally unused
+      void inputShapes;
+      void params;
       return { isValid: true }
     },
     computeShape: (inputShapes, params) => {
-      // Input layers determine their own shape
-      void inputShapes; // Explicitly mark as intentionally unused
-      // Input layers determine their own shape
+      void inputShapes;
+      
       if (params.computed_shape || params.shape) {
         const shapeString = String(params.computed_shape || params.shape || '(784,)')
         return parseShape(shapeString)
@@ -269,7 +164,6 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         return `Input(shape=${shape})`
       },
       pytorch: (params) => {
-        // PyTorch doesn't have explicit Input layers, but we can document the expected shape
         const inputType = String(params.inputType || 'image_grayscale')
         const height = Number(params.height) || 28
         const width = Number(params.width) || 28
@@ -343,7 +237,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       }
     ],
     validateInputs: (inputShapes, params) => {
-      void params; // Explicitly mark as intentionally unused
+      void params;
       if (inputShapes.length !== 1) {
         return { isValid: false, errorMessage: 'Output layer requires exactly one input' }
       }
@@ -446,7 +340,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       }
     ],
     validateInputs: (inputShapes, params) => {
-      void params; // Explicitly mark as intentionally unused
+      void params;
       if (inputShapes.length !== 1) {
         return { isValid: false, errorMessage: 'Dense layer requires exactly one input' }
       }
@@ -553,7 +447,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       }
     ],
     validateInputs: (inputShapes, params) => {
-      void params; // Explicitly mark as intentionally unused
+      void params;
       if (inputShapes.length !== 1) {
         return { isValid: false, errorMessage: 'Conv2D layer requires exactly one input' }
       }
@@ -604,7 +498,6 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         const stridesStr = String(params.strides) || '(1,1)'
         const padding = String(params.padding) || 'same'
         
-        // Parse kernel size and strides for PyTorch format
         const kernelSize = parseTupleOrNumber(kernelSizeStr)
         const strides = parseTupleOrNumber(stridesStr)
         
@@ -666,7 +559,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       }
     ],
     validateInputs: (inputShapes, params) => {
-      void params; // Explicitly mark as intentionally unused
+      void params;
       if (inputShapes.length !== 1) {
         return { isValid: false, errorMessage: 'MaxPool2D layer requires exactly one input' }
       }
@@ -742,7 +635,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
     },
     parameters: [],
     validateInputs: (inputShapes, params) => {
-      void params; // Explicitly mark as intentionally unused
+      void params;
       if (inputShapes.length !== 1) {
         return { isValid: false, errorMessage: 'Flatten layer requires exactly one input' }
       }
@@ -792,7 +685,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       }
     ],
     validateInputs: (inputShapes, params) => {
-      void params; // Explicitly mark as intentionally unused
+      void params;
       if (inputShapes.length !== 1) {
         return { isValid: false, errorMessage: 'Activation layer requires exactly one input' }
       }
@@ -848,7 +741,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       }
     ],
     validateInputs: (inputShapes, params) => {
-      void params; // Explicitly mark as intentionally unused
+      void params;
       if (inputShapes.length !== 1) {
         return { isValid: false, errorMessage: 'Dropout layer requires exactly one input' }
       }
@@ -870,208 +763,3 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
     }
   }
 }
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-/**
- * Get all layer definitions
- */
-export function getAllLayers(): Record<string, LayerDefinition> {
-  return layerDefinitions
-}
-
-/**
- * Get layer definition by type
- */
-export function getLayerDefinition(layerType: string): LayerDefinition | undefined {
-  return layerDefinitions[layerType]
-}
-
-/**
- * Get layers by category
- */
-export function getLayersByCategory(category: string): Array<{ type: string; definition: LayerDefinition }> {
-  return Object.entries(layerDefinitions)
-    .filter(([, def]) => def.metadata.category === category)
-    .map(([type, definition]) => ({ type, definition }))
-}
-
-// ============================================================================
-// LEGACY COMPATIBILITY FUNCTIONS
-// ============================================================================
-
-/** Runtime registry of all loaded layer definitions */
-export const layerDefs: Record<string, LayerDef> = {}
-
-/**
- * Populate layerDefs from new system
- */
-function initializeLayerDefs() {
-  Object.entries(layerDefinitions).forEach(([type, definition]) => {
-    const formSpec: LayerFormField[] = definition.parameters.map(param => {
-      const field: LayerFormField = {
-        key: param.key,
-        label: param.label,
-        type: param.type,
-        options: param.options,
-        min: param.validation?.min,
-        max: param.validation?.max,
-        default: param.default,
-        validation: param.validation
-      }
-
-      // Convert conditional logic from new system to old function format
-      if (param.conditional?.showWhen) {
-        field.show = (params: Record<string, LayerParamValue>) => {
-          return Object.entries(param.conditional!.showWhen!).every(([paramKey, allowedValues]) => {
-            const currentValue = String(params[paramKey] || '')
-            if (Array.isArray(allowedValues)) {
-              return allowedValues.includes(currentValue)
-            }
-            return allowedValues === currentValue
-          })
-        }
-      }
-
-      return field
-    })
-
-    // Add multiplier parameter for layers that support it
-    if (definition.supportsMultiplier) {
-      formSpec.push({
-        key: 'multiplier',
-        label: 'Multiplier',
-        type: 'number',
-        default: 1,
-        validation: { min: 1, max: 20 }
-      })
-    }
-
-    const defaultParams: Record<string, LayerParamValue> = {}
-    definition.parameters.forEach(param => {
-      if (param.default !== undefined) {
-        defaultParams[param.key] = param.default
-      }
-    })
-
-    // Add multiplier default for layers that support it
-    if (definition.supportsMultiplier) {
-      defaultParams.multiplier = 1
-    }
-
-    layerDefs[type] = {
-      type,
-      icon: definition.metadata.icon,
-      description: definition.metadata.description,
-      category: definition.metadata.category,
-      defaultParams,
-      formSpec,
-      codeGen: (params) => {
-        const baseCode = definition.generateCode.keras(params)
-        const multiplier = Number(params.multiplier) || 1
-        
-        if (multiplier > 1 && definition.supportsMultiplier) {
-          if (multiplier >= 5) {
-            // High multiplier case - use spread syntax with range for readability
-            return `# Repeated ${multiplier} times\n    *[${baseCode} for _ in range(${multiplier})]`
-          } else {
-            // Low multiplier case - list individual layers
-            return Array(multiplier).fill(baseCode).join(',\n    ')
-          }
-        }
-        
-        return baseCode
-      },
-      supportsMultiplier: definition.supportsMultiplier
-    }
-  })
-}
-
-// Initialize on module load
-initializeLayerDefs()
-
-/**
- * Get layer definition by type (legacy compatibility)
- */
-export function getLayerDef(type: string): LayerDef | undefined {
-  return layerDefs[type]
-}
-
-/**
- * Get default parameters for a layer type
- */
-export function getDefaultParams(type: string): Record<string, LayerParamValue> {
-  return layerDefs[type]?.defaultParams || {}
-}
-
-/**
- * Get icon for a layer type
- */
-export function getLayerIcon(type: string): string {
-  return layerDefs[type]?.icon || '🔧'
-}
-
-/**
- * Get all available layer types with basic metadata
- */
-export function getLayerTypes(): Array<{ type: string; icon: string; description: string }> {
-  return Object.entries(layerDefs).map(([type, def]) => ({
-    type,
-    icon: def.icon,
-    description: def.description
-  }))
-}
-
-/**
- * Generate Keras code for a layer with given parameters
- */
-export function generateLayerCode(type: string, params: Record<string, LayerParamValue>): string {
-  const layerDef = layerDefs[type]
-  if (!layerDef) {
-    return `# Unknown layer type: ${type}`
-  }
-  return layerDef.codeGen(params)
-}
-
-/**
- * Get required Keras imports for a list of layer types
- */
-export function getUsedKerasImports(layerTypes: string[]): string[] {
-  const imports = new Set<string>()
-  
-  layerTypes.forEach(type => {
-    const layerDefinition = layerDefinitions[type]
-    if (layerDefinition) {
-      // Extract import from the actual layer type name
-      imports.add(type)
-    }
-  })
-  
-  return Array.from(imports)
-}
-
-import { categories, getCategoryColorsByKey } from './categories'
-
-/**
- * Get layer categories with their associated layers
- */
-export function getLayerCategories() {
-  return Object.entries(categories).map(([key, category]) => {
-    const colorClasses = getCategoryColorsByKey(key)
-    const layersByCategory = getLayersByCategory(key)
-    
-    return {
-      name: category.name,
-      color: category.color,
-      bgColor: colorClasses.bg,
-      borderColor: colorClasses.border,
-      textColor: colorClasses.text,
-      description: category.description,
-      layerTypes: layersByCategory.map(({ type }: { type: string }) => type)
-    }
-  })
-}
-
-
