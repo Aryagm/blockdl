@@ -27,6 +27,7 @@ import "@xyflow/react/dist/style.css";
 
 import { LayerNode } from "./LayerNode";
 import { getDefaultParams } from "../lib/layers/parameters";
+import { getTemplateById } from "../lib/templates";
 import { useFlowStore } from "../lib/flow-store";
 import { cn } from "../lib/utils";
 
@@ -53,6 +54,8 @@ function CanvasEditorInner({ className = "" }: CanvasEditorProps) {
     onEdgesChange: handleEdgesChange,
     onConnect: handleConnect,
     addNode,
+    setNodes,
+    setEdges,
   } = useFlowStore();
 
   const [reactFlowInstance, setReactFlowInstance] =
@@ -97,27 +100,77 @@ function CanvasEditorInner({ className = "" }: CanvasEditorProps) {
 
       const reactFlowBounds = event.currentTarget.getBoundingClientRect();
       const layerType = event.dataTransfer.getData("layerType");
-
-      if (!layerType) return;
+      const templateId = event.dataTransfer.getData("templateId");
 
       const position: XYPosition = reactFlowInstance.screenToFlowPosition({
         x: event.clientX - reactFlowBounds.left,
         y: event.clientY - reactFlowBounds.top,
       });
 
-      const newNode: Node = {
-        id: `${layerType.toLowerCase()}-${Date.now()}`,
-        type: "layerNode",
-        position,
-        data: {
-          type: layerType,
-          params: getDefaultParams(layerType),
-        },
-      };
+      if (layerType) {
+        // Handle single layer drop
+        const newNode: Node = {
+          id: `${layerType.toLowerCase()}-${Date.now()}`,
+          type: "layerNode",
+          position,
+          data: {
+            type: layerType,
+            params: getDefaultParams(layerType),
+          },
+        };
 
-      addNode(newNode);
+        addNode(newNode);
+      } else if (templateId) {
+        // Handle template drop
+        const template = getTemplateById(templateId);
+        if (!template) return;
+
+        const timestamp = Date.now();
+        const nodeIdMap = new Map<string, string>();
+
+        // Create new nodes with unique IDs and adjusted positions
+        const newNodes: Node[] = template.layers.map((templateLayer) => {
+          const newId = `${templateLayer.type.toLowerCase()}-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
+          nodeIdMap.set(templateLayer.id, newId);
+
+          return {
+            id: newId,
+            type: "layerNode",
+            position: {
+              x: position.x + templateLayer.position.x,
+              y: position.y + templateLayer.position.y,
+            },
+            data: {
+              type: templateLayer.type,
+              params: templateLayer.params || getDefaultParams(templateLayer.type),
+            },
+          };
+        });
+
+        // Create new edges with updated node IDs
+        const newEdges = template.connections
+          .map((connection) => {
+            const sourceId = nodeIdMap.get(connection.source);
+            const targetId = nodeIdMap.get(connection.target);
+            
+            if (!sourceId || !targetId) return null;
+
+            return {
+              id: `${sourceId}-${targetId}`,
+              source: sourceId,
+              target: targetId,
+              type: 'smoothstep' as const,
+              style: { strokeWidth: 2, stroke: '#6b7280' }
+            };
+          })
+          .filter((edge): edge is NonNullable<typeof edge> => edge !== null);
+
+        // Add all nodes and edges at once
+        setNodes([...nodes, ...newNodes]);
+        setEdges([...edges, ...newEdges]);
+      }
     },
-    [reactFlowInstance, addNode]
+    [reactFlowInstance, addNode, setNodes, setEdges, nodes, edges]
   );
 
   return (
