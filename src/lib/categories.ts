@@ -1,11 +1,11 @@
 /**
  * Layer Category Definitions and Color Mappings
- * 
+ *
  * Single source of truth for layer categorization and theming.
  * Defines the visual categorization and theming for different types of neural network layers.
  */
 
-import { getLayersByCategory } from './layer-definitions'
+import { getLayersByCategory } from "./layer-definitions";
 
 // ============================================================================
 // CATEGORY DEFINITIONS
@@ -13,66 +13,66 @@ import { getLayersByCategory } from './layer-definitions'
 
 export const categories: Record<string, CategoryDefinition> = {
   input_output: {
-    name: 'Input/Output',
-    color: 'emerald',
-    description: 'Start and end points of your network',
-    icon: '🔌'
+    name: "Input/Output",
+    color: "emerald",
+    description: "Start and end points of your network",
+    icon: "🔌",
   },
   core: {
-    name: 'Core Layers',
-    color: 'slate',
-    description: 'Essential building blocks for neural networks',
-    icon: '🧱'
+    name: "Core Layers",
+    color: "slate",
+    description: "Essential building blocks for neural networks",
+    icon: "🧱",
   },
   dense: {
-    name: 'Dense Layers',
-    color: 'blue', 
-    description: 'Fully connected layers',
-    icon: '🔗'
+    name: "Dense Layers",
+    color: "blue",
+    description: "Fully connected layers",
+    icon: "🔗",
   },
   convolutional: {
-    name: 'Convolutional',
-    color: 'purple',
-    description: 'Conv2D and related layers',
-    icon: '🔲'
+    name: "Convolutional",
+    color: "purple",
+    description: "Conv2D and related layers",
+    icon: "🔲",
   },
   pooling: {
-    name: 'Pooling',
-    color: 'indigo',
-    description: 'Downsampling and upsampling',
-    icon: '🏊'
+    name: "Pooling",
+    color: "indigo",
+    description: "Downsampling and upsampling",
+    icon: "🏊",
   },
   transformation: {
-    name: 'Transformation',
-    color: 'amber',
-    description: 'Shape transformation layers',
-    icon: '🔄'
+    name: "Transformation",
+    color: "amber",
+    description: "Shape transformation layers",
+    icon: "🔄",
   },
   activation: {
-    name: 'Activation',
-    color: 'orange',
-    description: 'Non-linear activation functions',
-    icon: '⚡'
+    name: "Activation",
+    color: "orange",
+    description: "Non-linear activation functions",
+    icon: "⚡",
   },
   regularization: {
-    name: 'Regularization',
-    color: 'rose',
-    description: 'Batch normalization and dropout',
-    icon: '🛡️'
+    name: "Regularization",
+    color: "rose",
+    description: "Batch normalization and dropout",
+    icon: "🛡️",
   },
   sequence: {
-    name: 'Sequence',
-    color: 'cyan',
-    description: 'RNN and embedding layers',
-    icon: '📊'
+    name: "Sequence",
+    color: "cyan",
+    description: "RNN and embedding layers",
+    icon: "📊",
   },
   merge: {
-    name: 'Merge',
-    color: 'teal',
-    description: 'Layer combination operations', 
-    icon: '🔀'
-  }
-} as const
+    name: "Merge",
+    color: "teal",
+    description: "Layer combination operations",
+    icon: "🔀",
+  },
+} as const;
 
 // ============================================================================
 // COLOR MAPPINGS
@@ -81,84 +81,87 @@ export const categories: Record<string, CategoryDefinition> = {
 /**
  * Static color mapping to ensure Tailwind classes are included in build
  */
-const categoryColorMap: Record<string, { bg: string; border: string; text: string; hover: string }> = {
+const categoryColorMap: Record<
+  string,
+  { bg: string; border: string; text: string; hover: string }
+> = {
   emerald: {
-    bg: 'bg-emerald-50',
-    border: 'border-emerald-200',
-    text: 'text-emerald-700',
-    hover: 'hover:border-emerald-300 hover:shadow-emerald-200/50'
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    text: "text-emerald-700",
+    hover: "hover:border-emerald-300 hover:shadow-emerald-200/50",
   },
   blue: {
-    bg: 'bg-blue-50',
-    border: 'border-blue-200',
-    text: 'text-blue-700',
-    hover: 'hover:border-blue-300 hover:shadow-blue-200/50'
+    bg: "bg-blue-50",
+    border: "border-blue-200",
+    text: "text-blue-700",
+    hover: "hover:border-blue-300 hover:shadow-blue-200/50",
   },
   purple: {
-    bg: 'bg-purple-50',
-    border: 'border-purple-200',
-    text: 'text-purple-700',
-    hover: 'hover:border-purple-300 hover:shadow-purple-200/50'
+    bg: "bg-purple-50",
+    border: "border-purple-200",
+    text: "text-purple-700",
+    hover: "hover:border-purple-300 hover:shadow-purple-200/50",
   },
   indigo: {
-    bg: 'bg-indigo-50',
-    border: 'border-indigo-200',
-    text: 'text-indigo-700',
-    hover: 'hover:border-indigo-300 hover:shadow-indigo-200/50'
+    bg: "bg-indigo-50",
+    border: "border-indigo-200",
+    text: "text-indigo-700",
+    hover: "hover:border-indigo-300 hover:shadow-indigo-200/50",
   },
   amber: {
-    bg: 'bg-amber-50',
-    border: 'border-amber-200',
-    text: 'text-amber-700',
-    hover: 'hover:border-amber-300 hover:shadow-amber-200/50'
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+    text: "text-amber-700",
+    hover: "hover:border-amber-300 hover:shadow-amber-200/50",
   },
   orange: {
-    bg: 'bg-orange-50',
-    border: 'border-orange-200',
-    text: 'text-orange-700',
-    hover: 'hover:border-orange-300 hover:shadow-orange-200/50'
+    bg: "bg-orange-50",
+    border: "border-orange-200",
+    text: "text-orange-700",
+    hover: "hover:border-orange-300 hover:shadow-orange-200/50",
   },
   rose: {
-    bg: 'bg-rose-50',
-    border: 'border-rose-200',
-    text: 'text-rose-700',
-    hover: 'hover:border-rose-300 hover:shadow-rose-200/50'
+    bg: "bg-rose-50",
+    border: "border-rose-200",
+    text: "text-rose-700",
+    hover: "hover:border-rose-300 hover:shadow-rose-200/50",
   },
   cyan: {
-    bg: 'bg-cyan-50',
-    border: 'border-cyan-200',
-    text: 'text-cyan-700',
-    hover: 'hover:border-cyan-300 hover:shadow-cyan-200/50'
+    bg: "bg-cyan-50",
+    border: "border-cyan-200",
+    text: "text-cyan-700",
+    hover: "hover:border-cyan-300 hover:shadow-cyan-200/50",
   },
   teal: {
-    bg: 'bg-teal-50',
-    border: 'border-teal-200',
-    text: 'text-teal-700',
-    hover: 'hover:border-teal-300 hover:shadow-teal-200/50'
+    bg: "bg-teal-50",
+    border: "border-teal-200",
+    text: "text-teal-700",
+    hover: "hover:border-teal-300 hover:shadow-teal-200/50",
   },
   slate: {
-    bg: 'bg-gray-100',
-    border: 'border-gray-200',
-    text: 'text-gray-700',
-    hover: 'hover:border-slate-300 hover:shadow-slate-200/50'
-  }
-}
+    bg: "bg-gray-100",
+    border: "border-gray-200",
+    text: "text-gray-700",
+    hover: "hover:border-slate-300 hover:shadow-slate-200/50",
+  },
+};
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 export interface CategoryDefinition {
-  name: string
-  color: string
-  description: string
-  icon: string
+  name: string;
+  color: string;
+  description: string;
+  icon: string;
 }
 
 export interface CategoryColors {
-  bg: string
-  border: string
-  text: string
+  bg: string;
+  border: string;
+  text: string;
 }
 
 // ============================================================================
@@ -168,66 +171,76 @@ export interface CategoryColors {
 // Layer type to category mapping to avoid circular dependencies
 const layerCategoryMap: Record<string, string> = {
   // Input/Output
-  'Input': 'input_output',
-  'Output': 'input_output',
-  
+  Input: "input_output",
+  Output: "input_output",
+
   // Core
-  'Dense': 'core',
-  'Activation': 'core',
-  
+  Dense: "core",
+  Activation: "core",
+
   // Convolutional
-  'Conv2D': 'convolutional',
-  'Conv1D': 'convolutional',
-  'Conv2DTranspose': 'convolutional',
-  'SeparableConv2D': 'convolutional',
-  'ZeroPadding2D': 'convolutional',
-  'Cropping2D': 'convolutional',
-  
+  Conv2D: "convolutional",
+  Conv1D: "convolutional",
+  Conv2DTranspose: "convolutional",
+  SeparableConv2D: "convolutional",
+  ZeroPadding2D: "convolutional",
+  Cropping2D: "convolutional",
+
   // Pooling
-  'MaxPool2D': 'pooling',
-  'AveragePooling2D': 'pooling',
-  'GlobalAveragePooling2D': 'pooling',
-  
+  MaxPool2D: "pooling",
+  AveragePooling2D: "pooling",
+  GlobalAveragePooling2D: "pooling",
+
   // Transformation
-  'Flatten': 'transformation',
-  'Reshape': 'transformation',
-  'Permute': 'transformation',
-  'Merge': 'transformation',
-  
+  Flatten: "transformation",
+  Reshape: "transformation",
+  Permute: "transformation",
+  Merge: "transformation",
+
   // Regularization
-  'Dropout': 'regularization',
-  'BatchNormalization': 'regularization',
-  'LayerNormalization': 'regularization',
-  'GaussianNoise': 'regularization',
-  'SpatialDropout2D': 'regularization',
-  
+  Dropout: "regularization",
+  BatchNormalization: "regularization",
+  LayerNormalization: "regularization",
+  GaussianNoise: "regularization",
+  SpatialDropout2D: "regularization",
+
   // Sequence
-  'Embedding': 'sequence',
-  'LSTM': 'sequence',
-  'GRU': 'sequence',
-  'Bidirectional': 'sequence',
-  'TimeDistributed': 'sequence'
-}
+  Embedding: "sequence",
+  LSTM: "sequence",
+  GRU: "sequence",
+  Bidirectional: "sequence",
+  TimeDistributed: "sequence",
+};
 
 /**
  * Get category colors for a specific layer type
  */
-export function getLayerCategoryColors(layerType: string): { bg: string; border: string; text: string; hover: string } {
-  const category = layerCategoryMap[layerType] || 'core'
-  return getCategoryColorsByKey(category)
+export function getLayerCategoryColors(layerType: string): {
+  bg: string;
+  border: string;
+  text: string;
+  hover: string;
+} {
+  const category = layerCategoryMap[layerType] || "core";
+  return getCategoryColorsByKey(category);
 }
 
 /**
  * Get category colors by category key
  */
-export function getCategoryColorsByKey(categoryKey: string): { bg: string; border: string; text: string; hover: string } {
-  const categoryInfo = categories[categoryKey as keyof typeof categories]
-  
+export function getCategoryColorsByKey(categoryKey: string): {
+  bg: string;
+  border: string;
+  text: string;
+  hover: string;
+} {
+  const categoryInfo = categories[categoryKey as keyof typeof categories];
+
   if (!categoryInfo?.color) {
-    return categoryColorMap.blue // fallback to blue
+    return categoryColorMap.blue; // fallback to blue
   }
-  
-  return categoryColorMap[categoryInfo.color] || categoryColorMap.blue
+
+  return categoryColorMap[categoryInfo.color] || categoryColorMap.blue;
 }
 
 /**
@@ -235,9 +248,9 @@ export function getCategoryColorsByKey(categoryKey: string): { bg: string; borde
  */
 export function getLayerCategories() {
   return Object.entries(categories).map(([key, category]) => {
-    const colorClasses = getCategoryColorsByKey(key)
-    const layersByCategory = getLayersByCategory(key)
-    
+    const colorClasses = getCategoryColorsByKey(key);
+    const layersByCategory = getLayersByCategory(key);
+
     return {
       name: category.name,
       color: category.color,
@@ -245,7 +258,7 @@ export function getLayerCategories() {
       borderColor: colorClasses.border,
       textColor: colorClasses.text,
       description: category.description,
-      layerTypes: layersByCategory.map(({ type }: { type: string }) => type)
-    }
-  })
+      layerTypes: layersByCategory.map(({ type }: { type: string }) => type),
+    };
+  });
 }

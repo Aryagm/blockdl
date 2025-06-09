@@ -130,8 +130,13 @@ function CanvasEditorInner({ className = "" }: CanvasEditorProps) {
 
         // Create new nodes with unique IDs and adjusted positions
         const newNodes: Node[] = template.network.nodes.map((templateNode) => {
-          const nodeData = templateNode.data as { type: string; params: Record<string, unknown> };
-          const newId = `${nodeData.type.toLowerCase()}-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
+          const nodeData = templateNode.data as {
+            type: string;
+            params: Record<string, unknown>;
+          };
+          const newId = `${nodeData.type.toLowerCase()}-${timestamp}-${Math.random()
+            .toString(36)
+            .substr(2, 9)}`;
           nodeIdMap.set(templateNode.id, newId);
 
           return {
@@ -153,15 +158,15 @@ function CanvasEditorInner({ className = "" }: CanvasEditorProps) {
           .map((templateEdge) => {
             const sourceId = nodeIdMap.get(templateEdge.source);
             const targetId = nodeIdMap.get(templateEdge.target);
-            
+
             if (!sourceId || !targetId) return null;
 
             return {
               id: `${sourceId}-${targetId}`,
               source: sourceId,
               target: targetId,
-              type: 'smoothstep' as const,
-              style: { strokeWidth: 2, stroke: '#6b7280' }
+              type: "smoothstep" as const,
+              style: { strokeWidth: 2, stroke: "#6b7280" },
             };
           })
           .filter((edge): edge is NonNullable<typeof edge> => edge !== null);

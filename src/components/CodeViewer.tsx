@@ -6,7 +6,10 @@ import { Check, Copy, Download } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { parseGraphToDAG, type DAGResult } from "../lib/dag-parser";
-import { generateKerasCode, generateFunctionalKerasCode } from "../lib/code-generation";
+import {
+  generateKerasCode,
+  generateFunctionalKerasCode,
+} from "../lib/code-generation";
 import { useFlowStore } from "../lib/flow-store";
 import { cn } from "../lib/utils";
 
@@ -190,7 +193,9 @@ export function CodeViewer({ className = "" }: CodeViewerProps) {
 
       if (!dagResult.isValid) {
         setGeneratedCode(
-          `# Error: Invalid network structure\n# ${dagResult.errors.join("\n# ")}`
+          `# Error: Invalid network structure\n# ${dagResult.errors.join(
+            "\n# "
+          )}`
         );
         return;
       }
@@ -206,7 +211,7 @@ export function CodeViewer({ className = "" }: CodeViewerProps) {
         setGeneratedCode(generateKerasCode(dagResult.orderedNodes));
       }
     };
-    
+
     generateCode();
   }, [nodes, edges]);
 
@@ -250,9 +255,7 @@ export function CodeViewer({ className = "" }: CodeViewerProps) {
         )}
       >
         <Card className="border-slate-200 bg-white shadow-sm rounded-xl flex-1 flex flex-col min-h-0">
-          <CardHeader
-            className={cn("flex-shrink-0", UI_CONFIG.SPACING.CARD)}
-          >
+          <CardHeader className={cn("flex-shrink-0", UI_CONFIG.SPACING.CARD)}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -281,10 +284,10 @@ export function CodeViewer({ className = "" }: CodeViewerProps) {
           </CardContent>
           <div className="px-2 text-center">
             <div className="text-xs text-slate-500 font-semibold">
-              Made with ❤️ by {"  "} 
-              <a 
-                href="https://aryagm.com" 
-                target="_blank" 
+              Made with ❤️ by {"  "}
+              <a
+                href="https://aryagm.com"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 hover:text-blue-700 hover:underline transition-colors font-bold"
               >
