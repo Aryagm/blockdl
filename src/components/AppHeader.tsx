@@ -1,8 +1,9 @@
 import { useState, useCallback } from "react";
 import type { Node, Edge } from "@xyflow/react";
-import { Download, Upload, HelpCircle, Blocks, Trash2 } from "lucide-react";
+import { Download, Upload, HelpCircle, Trash2 } from "lucide-react";
 
 import { Button } from "./ui/button";
+import { Logo } from "./Logo";
 import {
   Dialog,
   DialogContent,
@@ -111,7 +112,7 @@ export function AppHeader({
     <header className="bg-white border-b border-slate-200 shadow-sm px-6 py-3 flex items-center justify-between">
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
-          <Blocks className="h-8 w-8 text-blue-600" />
+          <Logo className="h-8 w-8 text-slate-800" />
           <h1 className="text-xl font-bold text-slate-800">BlockDL</h1>
         </div>
       </div>
