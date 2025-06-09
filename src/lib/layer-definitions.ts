@@ -1175,6 +1175,754 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
     }
   },
 
+  // SEQUENCE LAYERS
+  // ============================================================================
+  
+  Embedding: {
+    metadata: {
+      category: 'sequence',
+      icon: '📋',
+      description: 'Embedding layer for converting indices to dense vectors',
+      tags: ['embedding', 'sequence', 'nlp', 'word2vec'],
+      performance: {
+        complexity: 'O(batch_size * sequence_length)',
+        memory: 'Moderate (vocab_size * embedding_dim parameters)',
+        usage: 'Convert discrete tokens/indices to dense vector representations'
+      }
+    },
+    parameters: [
+      {
+        key: 'input_dim',
+        type: 'number',
+        label: 'Input Dimension (Vocabulary Size)',
+        description: 'Size of the vocabulary (number of unique tokens)',
+        default: 10000,
+        validation: { min: 1, max: 1000000, required: true },
+        ui: { tooltip: 'Maximum index value + 1. E.g., 10000 for vocab of indices 0-9999' }
+      },
+      {
+        key: 'output_dim',
+        type: 'number',
+        label: 'Output Dimension (Embedding Size)',
+        description: 'Dimension of the dense embedding vectors',
+        default: 128,
+        validation: { min: 1, max: 2048, required: true },
+        ui: { tooltip: 'Higher dimensions can capture more relationships but require more memory' }
+      },
+      {
+        key: 'input_length',
+        type: 'number',
+        label: 'Input Length (optional)',
+        description: 'Length of input sequences (for shape inference)',
+        default: 100,
+        validation: { min: 1, max: 10000 },
+        ui: { tooltip: 'Maximum sequence length. Leave empty if variable length' }
+      },
+      {
+        key: 'mask_zero',
+        type: 'select',
+        label: 'Mask Zero',
+        description: 'Whether to mask zero values in input',
+        default: 'false',
+        options: [
+          { value: 'false', label: 'False', description: 'No masking' },
+          { value: 'true', label: 'True', description: 'Mask zero values (for padding)' }
+        ],
+        ui: { tooltip: 'Enable for padded sequences where 0 represents padding' }
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'Embedding layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length < 1 || inputShape.length > 2) {
+        return { isValid: false, errorMessage: 'Embedding layer requires 1D (batch,) or 2D (batch, sequence_length) input' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes, params) => {
+      if (inputShapes.length !== 1) return null
+      const inputShape = inputShapes[0]
+      if (inputShape.length < 1 || inputShape.length > 2) return null
+      
+      const outputDim = Number(params.output_dim) || 128
+      
+      if (inputShape.length === 1) {
+        // Input is (batch,) -> Output is (batch, output_dim)
+        return [outputDim]
+      } else {
+        // Input is (batch, sequence_length) -> Output is (batch, sequence_length, output_dim)
+        const sequenceLength = inputShape[0]
+        return [sequenceLength, outputDim]
+      }
+    },
+    generateCode: {
+      keras: (params) => {
+        const inputDim = Number(params.input_dim) || 10000
+        const outputDim = Number(params.output_dim) || 128
+        const inputLength = params.input_length ? Number(params.input_length) : null
+        const maskZero = String(params.mask_zero) === 'true'
+        
+        let code = `Embedding(${inputDim}, ${outputDim}`
+        
+        if (inputLength) {
+          code += `, input_length=${inputLength}`
+        }
+        
+        if (maskZero) {
+          code += `, mask_zero=True`
+        }
+        
+        code += ')'
+        
+        return code
+      }
+    }
+  },
+
+  LSTM: {
+    metadata: {
+      category: 'sequence',
+      icon: '🔄',
+      description: 'Long Short-Term Memory recurrent layer',
+      tags: ['lstm', 'rnn', 'sequence', 'recurrent', 'memory'],
+      performance: {
+        complexity: 'O(batch_size * sequence_length * units²)',
+        memory: 'High (stores cell state and hidden state)',
+        usage: 'Process sequential data with long-term dependencies'
+      }
+    },
+    parameters: [
+      {
+        key: 'units',
+        type: 'number',
+        label: 'Units',
+        description: 'Dimensionality of the output space',
+        default: 50,
+        validation: { min: 1, max: 2048, required: true },
+        ui: { tooltip: 'Number of LSTM units (memory cells)' }
+      },
+      {
+        key: 'activation',
+        type: 'select',
+        label: 'Activation',
+        description: 'Activation function for the LSTM gates',
+        default: 'tanh',
+        options: [
+          { value: 'tanh', label: 'Tanh', description: 'Hyperbolic tangent (default)' },
+          { value: 'relu', label: 'ReLU', description: 'Rectified Linear Unit' },
+          { value: 'sigmoid', label: 'Sigmoid', description: 'Sigmoid function' },
+          { value: 'hard_sigmoid', label: 'Hard Sigmoid', description: 'Faster approximation of sigmoid' }
+        ]
+      },
+      {
+        key: 'recurrent_activation',
+        type: 'select',
+        label: 'Recurrent Activation',
+        description: 'Activation function for recurrent connections',
+        default: 'sigmoid',
+        options: [
+          { value: 'sigmoid', label: 'Sigmoid', description: 'Sigmoid function (default)' },
+          { value: 'hard_sigmoid', label: 'Hard Sigmoid', description: 'Faster approximation of sigmoid' },
+          { value: 'tanh', label: 'Tanh', description: 'Hyperbolic tangent' }
+        ]
+      },
+      {
+        key: 'return_sequences',
+        type: 'select',
+        label: 'Return Sequences',
+        description: 'Whether to return the full sequence or just the last output',
+        default: 'false',
+        options: [
+          { value: 'false', label: 'False', description: 'Return only last output' },
+          { value: 'true', label: 'True', description: 'Return full sequence' }
+        ],
+        ui: { tooltip: 'True for stacking RNNs, False for final output' }
+      },
+      {
+        key: 'return_state',
+        type: 'select',
+        label: 'Return State',
+        description: 'Whether to return the last state in addition to output',
+        default: 'false',
+        options: [
+          { value: 'false', label: 'False', description: 'Return only output' },
+          { value: 'true', label: 'True', description: 'Return output and states' }
+        ]
+      },
+      {
+        key: 'dropout',
+        type: 'number',
+        label: 'Dropout',
+        description: 'Fraction of units to drop for input linear transformation',
+        default: 0.0,
+        validation: { min: 0, max: 1 },
+        ui: { tooltip: 'Regularization: 0.0 = no dropout, 0.5 = drop 50%' }
+      },
+      {
+        key: 'recurrent_dropout',
+        type: 'number',
+        label: 'Recurrent Dropout',
+        description: 'Fraction of units to drop for recurrent connections',
+        default: 0.0,
+        validation: { min: 0, max: 1 },
+        ui: { tooltip: 'Dropout for recurrent connections' }
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'LSTM layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 2) {
+        return { isValid: false, errorMessage: 'LSTM layer requires 2D input (sequence_length, features)' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes, params) => {
+      if (inputShapes.length !== 1) return null
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 2) return null
+      
+      const [sequenceLength] = inputShape
+      const units = Number(params.units) || 50
+      const returnSequences = String(params.return_sequences) === 'true'
+      
+      if (returnSequences) {
+        return [sequenceLength, units]
+      } else {
+        return [units]
+      }
+    },
+    generateCode: {
+      keras: (params) => {
+        const units = Number(params.units) || 50
+        const activation = params.activation ? String(params.activation) : 'tanh'
+        const recurrentActivation = params.recurrent_activation ? String(params.recurrent_activation) : 'sigmoid'
+        const returnSequences = String(params.return_sequences) === 'true'
+        const returnState = String(params.return_state) === 'true'
+        const dropout = Number(params.dropout) || 0.0
+        const recurrentDropout = Number(params.recurrent_dropout) || 0.0
+        
+        let code = `LSTM(${units}`
+        
+        if (activation !== 'tanh') {
+          code += `, activation='${activation}'`
+        }
+        if (recurrentActivation !== 'sigmoid') {
+          code += `, recurrent_activation='${recurrentActivation}'`
+        }
+        if (returnSequences) {
+          code += `, return_sequences=True`
+        }
+        if (returnState) {
+          code += `, return_state=True`
+        }
+        if (dropout > 0) {
+          code += `, dropout=${dropout}`
+        }
+        if (recurrentDropout > 0) {
+          code += `, recurrent_dropout=${recurrentDropout}`
+        }
+        
+        code += ')'
+        
+        return code
+      }
+    }
+  },
+
+  GRU: {
+    metadata: {
+      category: 'sequence',
+      icon: '🔄⚡',
+      description: 'Gated Recurrent Unit layer',
+      tags: ['gru', 'rnn', 'sequence', 'recurrent', 'gated'],
+      performance: {
+        complexity: 'O(batch_size * sequence_length * units²)',
+        memory: 'Medium (stores hidden state, simpler than LSTM)',
+        usage: 'Process sequential data, faster alternative to LSTM'
+      }
+    },
+    parameters: [
+      {
+        key: 'units',
+        type: 'number',
+        label: 'Units',
+        description: 'Dimensionality of the output space',
+        default: 50,
+        validation: { min: 1, max: 2048, required: true },
+        ui: { tooltip: 'Number of GRU units' }
+      },
+      {
+        key: 'activation',
+        type: 'select',
+        label: 'Activation',
+        description: 'Activation function for the GRU gates',
+        default: 'tanh',
+        options: [
+          { value: 'tanh', label: 'Tanh', description: 'Hyperbolic tangent (default)' },
+          { value: 'relu', label: 'ReLU', description: 'Rectified Linear Unit' },
+          { value: 'sigmoid', label: 'Sigmoid', description: 'Sigmoid function' },
+          { value: 'hard_sigmoid', label: 'Hard Sigmoid', description: 'Faster approximation of sigmoid' }
+        ]
+      },
+      {
+        key: 'recurrent_activation',
+        type: 'select',
+        label: 'Recurrent Activation',
+        description: 'Activation function for recurrent connections',
+        default: 'sigmoid',
+        options: [
+          { value: 'sigmoid', label: 'Sigmoid', description: 'Sigmoid function (default)' },
+          { value: 'hard_sigmoid', label: 'Hard Sigmoid', description: 'Faster approximation of sigmoid' },
+          { value: 'tanh', label: 'Tanh', description: 'Hyperbolic tangent' }
+        ]
+      },
+      {
+        key: 'return_sequences',
+        type: 'select',
+        label: 'Return Sequences',
+        description: 'Whether to return the full sequence or just the last output',
+        default: 'false',
+        options: [
+          { value: 'false', label: 'False', description: 'Return only last output' },
+          { value: 'true', label: 'True', description: 'Return full sequence' }
+        ],
+        ui: { tooltip: 'True for stacking RNNs, False for final output' }
+      },
+      {
+        key: 'return_state',
+        type: 'select',
+        label: 'Return State',
+        description: 'Whether to return the last state in addition to output',
+        default: 'false',
+        options: [
+          { value: 'false', label: 'False', description: 'Return only output' },
+          { value: 'true', label: 'True', description: 'Return output and states' }
+        ]
+      },
+      {
+        key: 'dropout',
+        type: 'number',
+        label: 'Dropout',
+        description: 'Fraction of units to drop for input linear transformation',
+        default: 0.0,
+        validation: { min: 0, max: 1 },
+        ui: { tooltip: 'Regularization: 0.0 = no dropout, 0.5 = drop 50%' }
+      },
+      {
+        key: 'recurrent_dropout',
+        type: 'number',
+        label: 'Recurrent Dropout',
+        description: 'Fraction of units to drop for recurrent connections',
+        default: 0.0,
+        validation: { min: 0, max: 1 },
+        ui: { tooltip: 'Dropout for recurrent connections' }
+      },
+      {
+        key: 'reset_after',
+        type: 'select',
+        label: 'Reset After',
+        description: 'GRU convention (whether to apply reset gate after or before matrix multiplication)',
+        default: 'true',
+        options: [
+          { value: 'true', label: 'True', description: 'Apply reset after matrix multiplication (CuDNN compatible)' },
+          { value: 'false', label: 'False', description: 'Apply reset before matrix multiplication' }
+        ],
+        ui: { tooltip: 'True is faster on GPU, False follows original paper' }
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'GRU layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 2) {
+        return { isValid: false, errorMessage: 'GRU layer requires 2D input (sequence_length, features)' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes, params) => {
+      if (inputShapes.length !== 1) return null
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 2) return null
+      
+      const [sequenceLength] = inputShape
+      const units = Number(params.units) || 50
+      const returnSequences = String(params.return_sequences) === 'true'
+      
+      if (returnSequences) {
+        return [sequenceLength, units]
+      } else {
+        return [units]
+      }
+    },
+    generateCode: {
+      keras: (params) => {
+        const units = Number(params.units) || 50
+        const activation = params.activation ? String(params.activation) : 'tanh'
+        const recurrentActivation = params.recurrent_activation ? String(params.recurrent_activation) : 'sigmoid'
+        const returnSequences = String(params.return_sequences) === 'true'
+        const returnState = String(params.return_state) === 'true'
+        const dropout = Number(params.dropout) || 0.0
+        const recurrentDropout = Number(params.recurrent_dropout) || 0.0
+        const resetAfter = params.reset_after ? String(params.reset_after) === 'true' : true
+        
+        let code = `GRU(${units}`
+        
+        if (activation !== 'tanh') {
+          code += `, activation='${activation}'`
+        }
+        if (recurrentActivation !== 'sigmoid') {
+          code += `, recurrent_activation='${recurrentActivation}'`
+        }
+        if (returnSequences) {
+          code += `, return_sequences=True`
+        }
+        if (returnState) {
+          code += `, return_state=True`
+        }
+        if (dropout > 0) {
+          code += `, dropout=${dropout}`
+        }
+        if (recurrentDropout > 0) {
+          code += `, recurrent_dropout=${recurrentDropout}`
+        }
+        if (!resetAfter) {
+          code += `, reset_after=False`
+        }
+        
+        code += ')'
+        
+        return code
+      }
+    }
+  },
+
+  Bidirectional: {
+    metadata: {
+      category: 'sequence',
+      icon: '↔️',
+      description: 'Bidirectional wrapper for RNNs',
+      tags: ['bidirectional', 'wrapper', 'rnn', 'sequence'],
+      performance: {
+        complexity: 'O(2 * wrapped_layer_complexity)',
+        memory: 'Double the wrapped layer memory',
+        usage: 'Process sequences in both forward and backward directions'
+      }
+    },
+    parameters: [
+      {
+        key: 'layer_type',
+        type: 'select',
+        label: 'Wrapped Layer Type',
+        description: 'Type of RNN layer to wrap',
+        default: 'LSTM',
+        validation: { required: true },
+        options: [
+          { value: 'LSTM', label: 'LSTM', description: 'Long Short-Term Memory' },
+          { value: 'GRU', label: 'GRU', description: 'Gated Recurrent Unit' }
+        ],
+        ui: { tooltip: 'The RNN layer that will be made bidirectional' }
+      },
+      {
+        key: 'units',
+        type: 'number',
+        label: 'Units',
+        description: 'Number of units in the wrapped layer',
+        default: 50,
+        validation: { min: 1, max: 2048, required: true },
+        ui: { tooltip: 'Units for the underlying RNN layer' }
+      },
+      {
+        key: 'merge_mode',
+        type: 'select',
+        label: 'Merge Mode',
+        description: 'How to combine forward and backward outputs',
+        default: 'concat',
+        options: [
+          { value: 'concat', label: 'Concatenate', description: 'Concatenate forward and backward outputs' },
+          { value: 'sum', label: 'Sum', description: 'Sum forward and backward outputs' },
+          { value: 'mul', label: 'Multiply', description: 'Multiply forward and backward outputs' },
+          { value: 'ave', label: 'Average', description: 'Average forward and backward outputs' },
+          { value: 'None', label: 'None', description: 'Return as list [forward, backward]' }
+        ],
+        ui: { tooltip: 'concat doubles output size, others keep same size' }
+      },
+      {
+        key: 'return_sequences',
+        type: 'select',
+        label: 'Return Sequences',
+        description: 'Whether to return the full sequence or just the last output',
+        default: 'false',
+        options: [
+          { value: 'false', label: 'False', description: 'Return only last output' },
+          { value: 'true', label: 'True', description: 'Return full sequence' }
+        ],
+        ui: { tooltip: 'True for stacking RNNs, False for final output' }
+      },
+      {
+        key: 'dropout',
+        type: 'number',
+        label: 'Dropout',
+        description: 'Dropout rate for the wrapped layer',
+        default: 0.0,
+        validation: { min: 0, max: 1 },
+        ui: { tooltip: 'Regularization: 0.0 = no dropout, 0.5 = drop 50%' }
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'Bidirectional layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 2) {
+        return { isValid: false, errorMessage: 'Bidirectional layer requires 2D input (sequence_length, features)' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes, params) => {
+      if (inputShapes.length !== 1) return null
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 2) return null
+      
+      const [sequenceLength] = inputShape
+      const units = Number(params.units) || 50
+      const returnSequences = String(params.return_sequences) === 'true'
+      const mergeMode = String(params.merge_mode) || 'concat'
+      
+      let outputUnits = units
+      if (mergeMode === 'concat') {
+        outputUnits = units * 2  // Forward + backward concatenated
+      }
+      // For other merge modes (sum, mul, ave), output size remains same as units
+      
+      if (returnSequences) {
+        return [sequenceLength, outputUnits]
+      } else {
+        return [outputUnits]
+      }
+    },
+    generateCode: {
+      keras: (params) => {
+        const layerType = String(params.layer_type) || 'LSTM'
+        const units = Number(params.units) || 50
+        const mergeMode = String(params.merge_mode) || 'concat'
+        const returnSequences = String(params.return_sequences) === 'true'
+        const dropout = Number(params.dropout) || 0.0
+        
+        let wrappedLayerCode = `${layerType}(${units}`
+        if (returnSequences) {
+          wrappedLayerCode += `, return_sequences=True`
+        }
+        if (dropout > 0) {
+          wrappedLayerCode += `, dropout=${dropout}`
+        }
+        wrappedLayerCode += ')'
+        
+        let code = `Bidirectional(${wrappedLayerCode}`
+        if (mergeMode !== 'concat') {
+          if (mergeMode === 'None') {
+            code += `, merge_mode=None`
+          } else {
+            code += `, merge_mode='${mergeMode}'`
+          }
+        }
+        code += ')'
+        
+        return code
+      }
+    }
+  },
+
+  TimeDistributed: {
+    metadata: {
+      category: 'sequence',
+      icon: '⏰',
+      description: 'Apply a layer to every temporal slice of an input',
+      tags: ['time-distributed', 'wrapper', 'sequence', 'temporal'],
+      performance: {
+        complexity: 'O(sequence_length * wrapped_layer_complexity)',
+        memory: 'Similar to wrapped layer, applied per time step',
+        usage: 'Apply Dense or Conv layers to each time step independently'
+      }
+    },
+    parameters: [
+      {
+        key: 'layer_type',
+        type: 'select',
+        label: 'Wrapped Layer Type',
+        description: 'Type of layer to apply at each time step',
+        default: 'Dense',
+        validation: { required: true },
+        options: [
+          { value: 'Dense', label: 'Dense', description: 'Fully connected layer' },
+          { value: 'Conv1D', label: 'Conv1D', description: '1D convolution layer' },
+          { value: 'Conv2D', label: 'Conv2D', description: '2D convolution layer' },
+          { value: 'Activation', label: 'Activation', description: 'Activation function' },
+          { value: 'Dropout', label: 'Dropout', description: 'Dropout regularization' }
+        ],
+        ui: { tooltip: 'The layer that will be applied to each time step' }
+      },
+      {
+        key: 'units',
+        type: 'number',
+        label: 'Units/Filters',
+        description: 'Number of units (for Dense) or filters (for Conv layers)',
+        default: 32,
+        validation: { min: 1, max: 2048 },
+        conditional: { showWhen: { layer_type: ['Dense', 'Conv1D', 'Conv2D'] } },
+        ui: { tooltip: 'Output dimension for the wrapped layer' }
+      },
+      {
+        key: 'kernel_size',
+        type: 'text',
+        label: 'Kernel Size',
+        description: 'Size of convolution kernel',
+        default: '(3,3)',
+        validation: { pattern: '^\\([0-9]+,[0-9]+\\)$' },
+        conditional: { showWhen: { layer_type: ['Conv2D'] } },
+        ui: { tooltip: 'e.g., (3,3) for 3x3 kernel' }
+      },
+      {
+        key: 'kernel_size_1d',
+        type: 'number',
+        label: 'Kernel Size',
+        description: 'Size of 1D convolution kernel',
+        default: 3,
+        validation: { min: 1, max: 100 },
+        conditional: { showWhen: { layer_type: ['Conv1D'] } },
+        ui: { tooltip: 'e.g., 3 for 3-point kernel' }
+      },
+      {
+        key: 'activation',
+        type: 'select',
+        label: 'Activation',
+        description: 'Activation function to use',
+        default: 'linear',
+        options: ACTIVATION_OPTIONS,
+        conditional: { showWhen: { layer_type: ['Dense', 'Conv1D', 'Conv2D', 'Activation'] } }
+      },
+      {
+        key: 'dropout_rate',
+        type: 'number',
+        label: 'Dropout Rate',
+        description: 'Fraction of input units to drop',
+        default: 0.5,
+        validation: { min: 0, max: 1 },
+        conditional: { showWhen: { layer_type: ['Dropout'] } },
+        ui: { tooltip: 'Between 0 and 1, e.g., 0.5 drops 50% of inputs' }
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'TimeDistributed layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length < 2) {
+        return { isValid: false, errorMessage: 'TimeDistributed layer requires at least 2D input (time_steps, features...)' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes, params) => {
+      if (inputShapes.length !== 1) return null
+      const inputShape = inputShapes[0]
+      if (inputShape.length < 2) return null
+      
+      const [timeSteps] = inputShape
+      const layerType = String(params.layer_type) || 'Dense'
+      
+      switch (layerType) {
+        case 'Dense': {
+          const units = Number(params.units) || 32
+          return [timeSteps, units]
+        }
+        case 'Conv1D': {
+          if (inputShape.length !== 3) return null // [time_steps, sequence_length, features]
+          const filters = Number(params.units) || 32
+          const sequenceLength = inputShape[1]
+          return [timeSteps, sequenceLength, filters]
+        }
+        case 'Conv2D': {
+          if (inputShape.length !== 4) return null // [time_steps, height, width, channels]
+          const filters = Number(params.units) || 32
+          const height = inputShape[1]
+          const width = inputShape[2]
+          return [timeSteps, height, width, filters]
+        }
+        case 'Activation':
+        case 'Dropout': {
+          return inputShape // Same shape
+        }
+        default:
+          return inputShape
+      }
+    },
+    generateCode: {
+      keras: (params) => {
+        const layerType = String(params.layer_type) || 'Dense'
+        
+        let wrappedLayerCode = ''
+        
+        switch (layerType) {
+          case 'Dense': {
+            const units = Number(params.units) || 32
+            const activation = params.activation ? String(params.activation) : 'linear'
+            wrappedLayerCode = `Dense(${units}`
+            if (activation !== 'linear') {
+              wrappedLayerCode += `, activation='${activation}'`
+            }
+            wrappedLayerCode += ')'
+            break
+          }
+          case 'Conv1D': {
+            const filters = Number(params.units) || 32
+            const kernelSize = Number(params.kernel_size_1d) || 3
+            const activation = params.activation ? String(params.activation) : 'linear'
+            wrappedLayerCode = `Conv1D(${filters}, kernel_size=${kernelSize}`
+            if (activation !== 'linear') {
+              wrappedLayerCode += `, activation='${activation}'`
+            }
+            wrappedLayerCode += ')'
+            break
+          }
+          case 'Conv2D': {
+            const filters = Number(params.units) || 32
+            const kernelSize = String(params.kernel_size) || '(3,3)'
+            const activation = params.activation ? String(params.activation) : 'linear'
+            wrappedLayerCode = `Conv2D(${filters}, kernel_size=${kernelSize}`
+            if (activation !== 'linear') {
+              wrappedLayerCode += `, activation='${activation}'`
+            }
+            wrappedLayerCode += ')'
+            break
+          }
+          case 'Activation': {
+            const activation = params.activation ? String(params.activation) : 'relu'
+            wrappedLayerCode = `Activation('${activation}')`
+            break
+          }
+          case 'Dropout': {
+            const rate = Number(params.dropout_rate) || 0.5
+            wrappedLayerCode = `Dropout(${rate})`
+            break
+          }
+          default:
+            wrappedLayerCode = `Dense(32)`
+        }
+        
+        return `TimeDistributed(${wrappedLayerCode})`
+      }
+    }
+  },
+
   // TRANSFORMATION LAYERS
   // ============================================================================
   
