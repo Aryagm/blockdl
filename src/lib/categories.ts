@@ -137,9 +137,9 @@ const categoryColorMap: Record<string, { bg: string; border: string; text: strin
     hover: 'hover:border-teal-300 hover:shadow-teal-200/50'
   },
   slate: {
-    bg: 'bg-slate-50',
-    border: 'border-slate-200',
-    text: 'text-slate-700',
+    bg: 'bg-gray-100',
+    border: 'border-gray-200',
+    text: 'text-gray-700',
     hover: 'hover:border-slate-300 hover:shadow-slate-200/50'
   }
 }
@@ -165,22 +165,56 @@ export interface CategoryColors {
 // UTILITY FUNCTIONS
 // ============================================================================
 
+// Layer type to category mapping to avoid circular dependencies
+const layerCategoryMap: Record<string, string> = {
+  // Input/Output
+  'Input': 'input_output',
+  'Output': 'input_output',
+  
+  // Core
+  'Dense': 'core',
+  'Activation': 'core',
+  
+  // Convolutional
+  'Conv2D': 'convolutional',
+  'Conv1D': 'convolutional',
+  'Conv2DTranspose': 'convolutional',
+  'SeparableConv2D': 'convolutional',
+  'ZeroPadding2D': 'convolutional',
+  'Cropping2D': 'convolutional',
+  
+  // Pooling
+  'MaxPool2D': 'pooling',
+  'AveragePooling2D': 'pooling',
+  'GlobalAveragePooling2D': 'pooling',
+  
+  // Transformation
+  'Flatten': 'transformation',
+  'Reshape': 'transformation',
+  'Permute': 'transformation',
+  'Merge': 'transformation',
+  
+  // Regularization
+  'Dropout': 'regularization',
+  'BatchNormalization': 'regularization',
+  'LayerNormalization': 'regularization',
+  'GaussianNoise': 'regularization',
+  'SpatialDropout2D': 'regularization',
+  
+  // Sequence
+  'Embedding': 'sequence',
+  'LSTM': 'sequence',
+  'GRU': 'sequence',
+  'Bidirectional': 'sequence',
+  'TimeDistributed': 'sequence'
+}
+
 /**
  * Get category colors for a specific layer type
- * Note: This function will be enhanced to use dynamic lookup once circular dependencies are resolved
  */
 export function getLayerCategoryColors(layerType: string): { bg: string; border: string; text: string; hover: string } {
-  void layerType; // Explicitly mark as intentionally unused
-  // For now, use the core category as default for all unknown layers
-  // The system will still work because all categories have proper colors defined
-  const category = 'core' // Simple fallback - the system is robust enough to handle this
-  const categoryInfo = categories[category as keyof typeof categories]
-  
-  if (!categoryInfo?.color) {
-    return categoryColorMap.blue // fallback to blue
-  }
-  
-  return categoryColorMap[categoryInfo.color] || categoryColorMap.blue
+  const category = layerCategoryMap[layerType] || 'core'
+  return getCategoryColorsByKey(category)
 }
 
 /**
