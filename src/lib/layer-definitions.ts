@@ -2278,7 +2278,7 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
   
   Dropout: {
     metadata: {
-      category: 'core',
+      category: 'regularization',
       icon: '🛡️',
       description: 'Randomly sets input units to 0 during training',
       tags: ['dropout', 'regularization'],
@@ -2314,6 +2314,287 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       keras: (params) => {
         const rate = Number(params.rate) || 0.5
         return `Dropout(${rate})`
+      }
+    }
+  },
+
+  BatchNormalization: {
+    metadata: {
+      category: 'regularization',
+      icon: '📊',
+      description: 'Batch normalization layer for internal covariate shift reduction',
+      tags: ['batch-norm', 'normalization', 'regularization', 'training-stability'],
+      performance: {
+        complexity: 'O(N) where N is number of features',
+        memory: 'Low (maintains running statistics)',
+        usage: 'Stabilize training, reduce internal covariate shift, allow higher learning rates'
+      }
+    },
+    parameters: [
+      {
+        key: 'axis',
+        type: 'number',
+        label: 'Axis',
+        description: 'Axis to normalize (usually -1 for last axis)',
+        default: -1,
+        validation: { min: -3, max: 3 },
+        ui: { tooltip: '-1 for feature axis, 1 for channels-first, 3 for channels-last' }
+      },
+      {
+        key: 'momentum',
+        type: 'number',
+        label: 'Momentum',
+        description: 'Momentum for moving average',
+        default: 0.99,
+        validation: { min: 0, max: 1 },
+        ui: { tooltip: 'Higher values = slower updates to running statistics' }
+      },
+      {
+        key: 'epsilon',
+        type: 'number',
+        label: 'Epsilon',
+        description: 'Small constant to prevent division by zero',
+        default: 0.001,
+        validation: { min: 0.00001, max: 0.1 },
+        ui: { tooltip: 'Small value added to variance for numerical stability' }
+      },
+      {
+        key: 'center',
+        type: 'boolean',
+        label: 'Center',
+        description: 'Whether to use beta parameter (learnable bias)',
+        default: true,
+        ui: { tooltip: 'If true, adds learnable bias parameter' }
+      },
+      {
+        key: 'scale',
+        type: 'boolean',
+        label: 'Scale',
+        description: 'Whether to use gamma parameter (learnable scale)',
+        default: true,
+        ui: { tooltip: 'If true, adds learnable scaling parameter' }
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'BatchNormalization layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length < 1) {
+        return { isValid: false, errorMessage: 'BatchNormalization layer requires at least 1D input' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes) => {
+      if (inputShapes.length !== 1) return null
+      return inputShapes[0] // BatchNorm preserves input shape
+    },
+    generateCode: {
+      keras: (params) => {
+        const axis = Number(params.axis) || -1
+        const momentum = Number(params.momentum) || 0.99
+        const epsilon = Number(params.epsilon) || 0.001
+        const center = String(params.center) !== 'false'
+        const scale = String(params.scale) !== 'false'
+        
+        let code = 'BatchNormalization('
+        
+        // Only add parameters if they differ from defaults
+        const parts = []
+        if (axis !== -1) parts.push(`axis=${axis}`)
+        if (momentum !== 0.99) parts.push(`momentum=${momentum}`)
+        if (epsilon !== 0.001) parts.push(`epsilon=${epsilon}`)
+        if (!center) parts.push('center=False')
+        if (!scale) parts.push('scale=False')
+        
+        code += parts.join(', ')
+        code += ')'
+        
+        return code
+      }
+    }
+  },
+
+  LayerNormalization: {
+    metadata: {
+      category: 'regularization',
+      icon: '📏',
+      description: 'Layer normalization for stabilizing training across features',
+      tags: ['layer-norm', 'normalization', 'regularization', 'transformers'],
+      performance: {
+        complexity: 'O(N) where N is number of features',
+        memory: 'Low (no running statistics)',
+        usage: 'Alternative to batch norm, works well with variable batch sizes and RNNs'
+      }
+    },
+    parameters: [
+      {
+        key: 'axis',
+        type: 'text',
+        label: 'Axis',
+        description: 'Axis or axes to normalize (e.g., -1 or [-2, -1])',
+        default: '-1',
+        validation: { required: true },
+        ui: { tooltip: 'Can be single axis (-1) or list of axes ([-2, -1])' }
+      },
+      {
+        key: 'epsilon',
+        type: 'number',
+        label: 'Epsilon',
+        description: 'Small constant to prevent division by zero',
+        default: 0.001,
+        validation: { min: 0.00001, max: 0.1 },
+        ui: { tooltip: 'Small value added to variance for numerical stability' }
+      },
+      {
+        key: 'center',
+        type: 'boolean',
+        label: 'Center',
+        description: 'Whether to use beta parameter (learnable bias)',
+        default: true,
+        ui: { tooltip: 'If true, adds learnable bias parameter' }
+      },
+      {
+        key: 'scale',
+        type: 'boolean',
+        label: 'Scale',
+        description: 'Whether to use gamma parameter (learnable scale)',
+        default: true,
+        ui: { tooltip: 'If true, adds learnable scaling parameter' }
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'LayerNormalization layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length < 1) {
+        return { isValid: false, errorMessage: 'LayerNormalization layer requires at least 1D input' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes) => {
+      if (inputShapes.length !== 1) return null
+      return inputShapes[0] // LayerNorm preserves input shape
+    },
+    generateCode: {
+      keras: (params) => {
+        const axisStr = String(params.axis) || '-1'
+        const epsilon = Number(params.epsilon) || 0.001
+        const center = String(params.center) !== 'false'
+        const scale = String(params.scale) !== 'false'
+        
+        let code = 'LayerNormalization('
+        
+        // Parse axis parameter
+        let axisParam = axisStr
+        if (axisStr.includes('[') || axisStr.includes(',')) {
+          // Handle list format like [-2, -1] or -2, -1
+          axisParam = axisStr.replace(/[[\]]/g, '').split(',').map(s => s.trim()).join(', ')
+          axisParam = `[${axisParam}]`
+        }
+        
+        // Build parameters
+        const parts = []
+        if (axisStr !== '-1') parts.push(`axis=${axisParam}`)
+        if (epsilon !== 0.001) parts.push(`epsilon=${epsilon}`)
+        if (!center) parts.push('center=False')
+        if (!scale) parts.push('scale=False')
+        
+        code += parts.join(', ')
+        code += ')'
+        
+        return code
+      }
+    }
+  },
+
+  GaussianNoise: {
+    metadata: {
+      category: 'regularization',
+      icon: '🎲',
+      description: 'Apply additive zero-centered Gaussian noise for regularization',
+      tags: ['gaussian-noise', 'noise', 'regularization', 'augmentation'],
+      performance: {
+        complexity: 'O(N) where N is number of features',
+        memory: 'Low (generates noise on-the-fly)',
+        usage: 'Data augmentation, regularization, improve generalization'
+      }
+    },
+    parameters: [
+      {
+        key: 'stddev',
+        type: 'number',
+        label: 'Standard Deviation',
+        description: 'Standard deviation of the noise distribution',
+        default: 1.0,
+        validation: { min: 0.001, max: 10.0, required: true },
+        ui: { tooltip: 'Higher values = more noise. Typical range: 0.1-2.0' }
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'GaussianNoise layer requires exactly one input' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes) => {
+      if (inputShapes.length !== 1) return null
+      return inputShapes[0] // GaussianNoise preserves input shape
+    },
+    generateCode: {
+      keras: (params) => {
+        const stddev = Number(params.stddev) || 1.0
+        return `GaussianNoise(${stddev})`
+      }
+    }
+  },
+
+  SpatialDropout2D: {
+    metadata: {
+      category: 'regularization',
+      icon: '🛡️🔲',
+      description: 'Spatial dropout for 2D feature maps (drops entire channels)',
+      tags: ['spatial-dropout', 'dropout', 'regularization', '2d', 'channels'],
+      performance: {
+        complexity: 'O(N) where N is number of feature maps',
+        memory: 'Low (only mask generation)',
+        usage: 'Regularization for convolutional layers, prevents overfitting in CNNs'
+      }
+    },
+    parameters: [
+      {
+        key: 'rate',
+        type: 'number',
+        label: 'Dropout Rate',
+        description: 'Fraction of feature maps to drop',
+        default: 0.5,
+        validation: { min: 0, max: 1, required: true },
+        ui: { tooltip: 'Between 0 and 1, e.g., 0.2 drops 20% of feature maps entirely' }
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'SpatialDropout2D layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 3) {
+        return { isValid: false, errorMessage: 'SpatialDropout2D layer requires 3D input (height, width, channels)' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes) => {
+      if (inputShapes.length !== 1) return null
+      return inputShapes[0] // SpatialDropout2D preserves input shape
+    },
+    generateCode: {
+      keras: (params) => {
+        const rate = Number(params.rate) || 0.5
+        return `SpatialDropout2D(${rate})`
       }
     }
   },
