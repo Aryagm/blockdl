@@ -29,11 +29,9 @@ export interface NetworkTemplate {
   metadata: {
     inputShape?: number[]
     outputClasses?: number
-    complexity: 'beginner' | 'intermediate' | 'advanced'
     useCase: string
     performance: {
       trainTime: string
-      accuracy: string
       parameters: string
     }
   }
@@ -99,7 +97,7 @@ export const templates: NetworkTemplate[] = [
     name: 'Simple Classifier',
     description: 'Basic dense network for classification tasks',
     icon: '🎯',
-    tags: ['beginner', 'dense', 'classification'],
+    tags: ['dense', 'classification'],
     category: 'classification',
     layers: [
       {
@@ -142,11 +140,9 @@ export const templates: NetworkTemplate[] = [
     metadata: {
       inputShape: [784],
       outputClasses: 10,
-      complexity: 'beginner',
       useCase: 'MNIST digit classification, simple tabular data',
       performance: {
         trainTime: '< 5 minutes',
-        accuracy: '~95%',
         parameters: '~110K'
       }
     }

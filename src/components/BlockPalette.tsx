@@ -259,9 +259,6 @@ export default function BlockPalette({ className = "" }: BlockPaletteProps = {})
                       <div className={`flex items-center gap-2 mb-1 ${categoryData.textColor}`}>
                         <span className="text-base">{template.icon}</span>
                         <span className="font-medium text-sm">{template.name}</span>
-                        <span className={`text-xs px-2 py-1 rounded-full ${categoryData.bgColor} ${categoryData.textColor} opacity-75`}>
-                          {template.metadata.complexity}
-                        </span>
                       </div>
                       <p className="text-xs text-slate-500 leading-relaxed mb-2">
                         {template.description}
