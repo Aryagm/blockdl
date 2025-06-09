@@ -878,6 +878,137 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
     }
   },
 
+  AveragePooling2D: {
+    metadata: {
+      category: 'pooling',
+      icon: '🌊',
+      description: 'Average pooling operation for 2D spatial data',
+      tags: ['pooling', 'average', 'cnn'],
+      performance: {
+        complexity: 'O(H*W*C)',
+        memory: 'Low',
+        usage: 'Reduce spatial dimensions by averaging values'
+      }
+    },
+    parameters: [
+      {
+        key: 'pool_size',
+        type: 'text',
+        label: 'Pool Size',
+        description: 'Size of pooling window',
+        default: '(2,2)',
+        validation: { pattern: '^\\([0-9]+,[0-9]+\\)$', required: true },
+        ui: { tooltip: 'Typically (2,2) to halve dimensions' }
+      },
+      {
+        key: 'strides',
+        type: 'text',
+        label: 'Strides (optional)',
+        description: 'Strides of pooling operation',
+        default: '',
+        validation: { pattern: '^\\([0-9]+,[0-9]+\\)$' },
+        ui: { tooltip: 'Defaults to pool_size if empty' }
+      },
+      {
+        key: 'padding',
+        type: 'select',
+        label: 'Padding',
+        description: 'Padding strategy',
+        default: 'valid',
+        options: [
+          { value: 'valid', label: 'Valid', description: 'No padding' },
+          { value: 'same', label: 'Same', description: 'Padding to maintain dimensions' }
+        ]
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'AveragePooling2D layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 3) {
+        return { isValid: false, errorMessage: 'AveragePooling2D layer requires 3D input (height, width, channels)' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes, params) => {
+      if (inputShapes.length !== 1) return null
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 3) return null
+      
+      const [inputHeight, inputWidth, channels] = inputShape
+      const poolSize = parseTupleOrNumber(String(params.pool_size) || '(2,2)')
+      const stridesParam = params.strides || params.pool_size || '(2,2)'
+      const strides = parseTupleOrNumber(String(stridesParam))
+      const padding = String(params.padding) || 'valid'
+      
+      if (!poolSize || !strides) return null
+      
+      let outputHeight: number
+      let outputWidth: number
+      
+      if (padding === 'same') {
+        outputHeight = Math.ceil(inputHeight / strides[0])
+        outputWidth = Math.ceil(inputWidth / strides[1])
+      } else {
+        outputHeight = Math.floor((inputHeight - poolSize[0]) / strides[0]) + 1
+        outputWidth = Math.floor((inputWidth - poolSize[1]) / strides[1]) + 1
+      }
+      
+      return [outputHeight, outputWidth, channels]
+    },
+    generateCode: {
+      keras: (params) => {
+        const poolSize = String(params.pool_size) || '(2,2)'
+        const strides = params.strides ? `, strides=${params.strides}` : ''
+        const padding = String(params.padding) || 'valid'
+        
+        return `AveragePooling2D(pool_size=${poolSize}${strides}, padding='${padding}')`
+      }
+    }
+  },
+
+  GlobalAveragePooling2D: {
+    metadata: {
+      category: 'pooling',
+      icon: '🌍',
+      description: 'Global average pooling operation for 2D spatial data',
+      tags: ['pooling', 'global', 'average', 'cnn'],
+      performance: {
+        complexity: 'O(H*W*C)',
+        memory: 'Very low',
+        usage: 'Replace Flatten + Dense layers, reduce overfitting'
+      }
+    },
+    parameters: [],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'GlobalAveragePooling2D layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 3) {
+        return { isValid: false, errorMessage: 'GlobalAveragePooling2D layer requires 3D input (height, width, channels)' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes) => {
+      if (inputShapes.length !== 1) return null
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 3) return null
+      
+      const [, , channels] = inputShape
+      
+      // Global average pooling reduces spatial dimensions to 1x1, keeping only channels
+      return [channels]
+    },
+    generateCode: {
+      keras: () => 'GlobalAveragePooling2D()'
+    }
+  },
+
+  // ZeroPadding2D layer kept at the end to avoid conflicts with tuple parsing in other layers
   ZeroPadding2D: {
     metadata: {
       category: 'convolutional',
