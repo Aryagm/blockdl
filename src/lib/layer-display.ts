@@ -81,6 +81,10 @@ const computeInputShapeDisplay = (params: Record<string, LayerParamValue>): stri
       const features = Number(params.features) || 128
       return `${seqLen}×${features}`
     }
+    case 'sequence_indices': {
+      const seqLen = Number(params.seqIndicesLength) || 784
+      return `${seqLen}`
+    }
     default: {
       return '28×28×1'
     }
@@ -93,7 +97,8 @@ const getInputTypeLabel = (inputType: string): string => {
     'image_color': 'Color', 
     'image_custom': 'Custom Image',
     'flat_data': 'Flattened',
-    'sequence': 'Sequence'
+    'sequence': 'Sequence',
+    'sequence_indices': 'Token Indices'
   }
   return labels[inputType] || inputType
 }

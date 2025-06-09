@@ -129,29 +129,30 @@ function CanvasEditorInner({ className = "" }: CanvasEditorProps) {
         const nodeIdMap = new Map<string, string>();
 
         // Create new nodes with unique IDs and adjusted positions
-        const newNodes: Node[] = template.layers.map((templateLayer) => {
-          const newId = `${templateLayer.type.toLowerCase()}-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
-          nodeIdMap.set(templateLayer.id, newId);
+        const newNodes: Node[] = template.network.nodes.map((templateNode) => {
+          const nodeData = templateNode.data as { type: string; params: Record<string, unknown> };
+          const newId = `${nodeData.type.toLowerCase()}-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
+          nodeIdMap.set(templateNode.id, newId);
 
           return {
             id: newId,
             type: "layerNode",
             position: {
-              x: position.x + templateLayer.position.x,
-              y: position.y + templateLayer.position.y,
+              x: position.x + templateNode.position.x,
+              y: position.y + templateNode.position.y,
             },
             data: {
-              type: templateLayer.type,
-              params: templateLayer.params || getDefaultParams(templateLayer.type),
+              type: nodeData.type,
+              params: nodeData.params || getDefaultParams(nodeData.type),
             },
           };
         });
 
         // Create new edges with updated node IDs
-        const newEdges = template.connections
-          .map((connection) => {
-            const sourceId = nodeIdMap.get(connection.source);
-            const targetId = nodeIdMap.get(connection.target);
+        const newEdges = template.network.edges
+          .map((templateEdge) => {
+            const sourceId = nodeIdMap.get(templateEdge.source);
+            const targetId = nodeIdMap.get(templateEdge.target);
             
             if (!sourceId || !targetId) return null;
 

@@ -3,7 +3,7 @@
  */
 
 import type { DAGResult, LayerObject } from './dag-parser'
-import { generateLayerCode, getUsedKerasImports, getLayerDefinition } from './layer-definitions'
+import { generateLayerCode, getUsedKerasImports, getMergeLayerImports, getLayerDefinition } from './layer-definitions'
 
 /**
  * Common compilation and summary code for both Sequential and Functional API
@@ -51,10 +51,15 @@ export function generateKerasCode(layers: LayerObject[]): string {
   // Generate imports
   const usedLayerTypes = layers.map(layer => layer.type)
   const kerasImports = getUsedKerasImports(usedLayerTypes)
+  const mergeImports = getMergeLayerImports(layers)
+  
+  // Combine and deduplicate imports
+  const allImports = [...new Set([...kerasImports, ...mergeImports])]
+  
   const imports = [
     'import tensorflow as tf',
     'from tensorflow.keras.models import Sequential',
-    `from tensorflow.keras.layers import ${kerasImports.join(', ')}`
+    `from tensorflow.keras.layers import ${allImports.join(', ')}`
   ]
 
   // Generate model creation
@@ -242,11 +247,16 @@ export async function generateFunctionalKerasCode(dagResult: DAGResult): Promise
   // Generate imports
   const usedLayerTypes = orderedNodes.map(layer => layer.type).filter(type => type !== 'Input')
   const kerasImports = getUsedKerasImports(usedLayerTypes)
+  const mergeImports = getMergeLayerImports(orderedNodes)
+  
+  // Combine and deduplicate imports
+  const allImports = [...new Set([...kerasImports, ...mergeImports])]
+  
   const imports = [
     'import tensorflow as tf',
     'from tensorflow.keras.models import Model',
     'from tensorflow.keras.layers import Input',
-    `from tensorflow.keras.layers import ${kerasImports.join(', ')}`
+    `from tensorflow.keras.layers import ${allImports.join(', ')}`
   ]
 
   const codeLines: string[] = [...imports, '']

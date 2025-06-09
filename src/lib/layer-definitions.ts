@@ -11,6 +11,7 @@
  */
 
 import { parseTupleOrNumber } from './utils'
+import type { LayerObject } from './dag-parser'
 
 // ============================================================================
 // ACTIVATION CONSTANTS
@@ -129,7 +130,8 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
           { value: 'image_color', label: 'Color Image (H×W×3)', description: 'RGB color images' },
           { value: 'image_custom', label: 'Custom Image (H×W×C)', description: 'Images with custom channels' },
           { value: 'flat_data', label: 'Flattened Data (N,)', description: '1D vector data' },
-          { value: 'sequence', label: 'Sequence Data (seq_len, features)', description: 'Time series or text data' }
+          { value: 'sequence', label: 'Sequence Data (seq_len, features)', description: 'Time series or text data' },
+          { value: 'sequence_indices', label: 'Sequence Indices (seq_len,)', description: 'Token indices for embeddings and LSTMs' }
         ]
       },
       {
@@ -185,6 +187,15 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         default: 128,
         validation: { min: 1, max: 10000 },
         conditional: { showWhen: { inputType: ['sequence'] } }
+      },
+      {
+        key: 'seqIndicesLength',
+        type: 'number',
+        label: 'Sequence Length',
+        description: 'Length of token sequence',
+        default: 784,
+        validation: { min: 1, max: 100000 },
+        conditional: { showWhen: { inputType: ['sequence_indices'] } }
       }
     ],
     validateInputs: () => ({ isValid: true }),
@@ -216,6 +227,10 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
           const seqLen = Number(params.seqLength) || 100
           const features = Number(params.features) || 128
           return [seqLen, features]
+        }
+        case 'sequence_indices': {
+          const seqLen = Number(params.seqIndicesLength) || 784
+          return [seqLen]
         }
         default: {
           return [28, 28, 1]
@@ -251,6 +266,10 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
             const seqLen = Number(params.seqLength) || 100
             const features = Number(params.features) || 128
             return `Input(shape=(${seqLen}, ${features}))`
+          }
+          case 'sequence_indices': {
+            const seqLen = Number(params.seqIndicesLength) || 784
+            return `Input(shape=(${seqLen},))`
           }
           default: {
             return `Input(shape=(28, 28, 1))`
@@ -384,6 +403,17 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         validation: { min: 1, max: 10000, required: true }
       },
       {
+        key: 'use_bias',
+        type: 'select',
+        label: 'Use Bias',
+        description: 'Whether to include a bias vector',
+        default: 'true',
+        options: [
+          { value: 'true', label: 'True', description: 'Include bias terms' },
+          { value: 'false', label: 'False', description: 'No bias terms' }
+        ]
+      },
+      {
         key: 'activation',
         type: 'select',
         label: 'Activation',
@@ -417,12 +447,17 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       keras: (params: Record<string, unknown>) => {
         const units = Number(params.units) || 128
         const activation = String(params.activation) || 'linear'
+        const useBias = String(params.use_bias) !== 'false'
         
-        if (activation === 'linear') {
-          return `Dense(${units})`
-        } else {
-          return `Dense(${units}, activation='${activation}')`
+        let code = `Dense(${units}`
+        if (activation !== 'linear') {
+          code += `, activation='${activation}'`
         }
+        if (!useBias) {
+          code += `, use_bias=False`
+        }
+        code += ')'
+        return code
       }
     },
     supportsMultiplier: true,
@@ -483,6 +518,17 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         ]
       },
       {
+        key: 'use_bias',
+        type: 'select',
+        label: 'Use Bias',
+        description: 'Whether to include a bias vector',
+        default: 'true',
+        options: [
+          { value: 'true', label: 'True', description: 'Include bias terms' },
+          { value: 'false', label: 'False', description: 'No bias terms' }
+        ]
+      },
+      {
         key: 'activation',
         type: 'select',
         label: 'Activation',
@@ -535,10 +581,14 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         const strides = String(params.strides) || '(1,1)'
         const padding = String(params.padding) || 'same'
         const activation = String(params.activation) || 'linear'
+        const useBias = String(params.use_bias) !== 'false'
         
         let code = `Conv2D(${filters}, kernel_size=${kernelSize}, strides=${strides}, padding='${padding}'`
         if (activation !== 'linear') {
           code += `, activation='${activation}'`
+        }
+        if (!useBias) {
+          code += `, use_bias=False`
         }
         code += ')'
         
@@ -717,6 +767,17 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         ]
       },
       {
+        key: 'use_bias',
+        type: 'select',
+        label: 'Use Bias',
+        description: 'Whether to include a bias vector',
+        default: 'true',
+        options: [
+          { value: 'true', label: 'True', description: 'Include bias terms' },
+          { value: 'false', label: 'False', description: 'No bias terms' }
+        ]
+      },
+      {
         key: 'activation',
         type: 'select',
         label: 'Activation',
@@ -770,10 +831,14 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         const strides = String(params.strides) || '(2,2)'
         const padding = String(params.padding) || 'same'
         const activation = String(params.activation) || 'linear'
+        const useBias = String(params.use_bias) !== 'false'
         
         let code = `Conv2DTranspose(${filters}, kernel_size=${kernelSize}, strides=${strides}, padding='${padding}'`
         if (activation !== 'linear') {
           code += `, activation='${activation}'`
+        }
+        if (!useBias) {
+          code += `, use_bias=False`
         }
         code += ')'
         
@@ -1250,8 +1315,9 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
       const outputDim = Number(params.output_dim) || 128
       
       if (inputShape.length === 1) {
-        // Input is (batch,) -> Output is (batch, output_dim)
-        return [outputDim]
+        // Input is (sequence_length,) -> Output is (sequence_length, output_dim)
+        const sequenceLength = inputShape[0]
+        return [sequenceLength, outputDim]
       } else {
         // Input is (batch, sequence_length) -> Output is (batch, sequence_length, output_dim)
         const sequenceLength = inputShape[0]
@@ -2815,10 +2881,61 @@ export function getUsedKerasImports(layerTypes: string[]): string[] {
     if (layerDefinition) {
       // Extract import from the actual layer type name
       imports.add(type)
+
+      // If Output is in imports then remove it and add Dense if not present
+      if (type === 'Output')  {
+        imports.delete('Output')
+        imports.add('Dense')
+      }
+      if (type === 'Merge')  {
+        imports.delete('Merge')
+      }
     }
   })
   
   return Array.from(imports)
+}
+
+/**
+ * Get additional imports needed for merge operations
+ */
+export function getMergeLayerImports(layers: LayerObject[]): string[] {
+  const mergeImports = new Set<string>()
+  
+  layers.forEach(layer => {
+    if (layer.type === 'Merge') {
+      const mode = String(layer.params.mode) || 'concat'
+      switch (mode) {
+        case 'add':
+          mergeImports.add('Add')
+          break
+        case 'multiply':
+          mergeImports.add('Multiply')
+          break
+        case 'average':
+          mergeImports.add('Average')
+          break
+        case 'maximum':
+          mergeImports.add('Maximum')
+          break
+        case 'minimum':
+          mergeImports.add('Minimum')
+          break
+        case 'subtract':
+          mergeImports.add('Subtract')
+          break
+        case 'dot':
+          mergeImports.add('Dot')
+          break
+        case 'concat':
+        default:
+          mergeImports.add('Concatenate')
+          break
+      }
+    }
+  })
+  
+  return Array.from(mergeImports)
 }
 
 import { categories, getCategoryColorsByKey } from './categories'
