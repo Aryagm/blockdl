@@ -665,6 +665,125 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
     supportsActivation: true
   },
 
+  Conv2DTranspose: {
+    metadata: {
+      category: 'convolutional',
+      icon: '🔲↗️',
+      description: 'Transposed 2D convolution layer for upsampling',
+      tags: ['convolution', 'cnn', '2d', 'transpose', 'upsampling', 'deconvolution'],
+      performance: {
+        complexity: 'O(H*W*C*F*K²) where H,W=output size, C=input channels, F=filters, K=kernel size',
+        memory: 'Moderate, depends on filter count and output size',
+        usage: 'Upsampling for image generation, segmentation, and autoencoders'
+      }
+    },
+    parameters: [
+      {
+        key: 'filters',
+        type: 'number',
+        label: 'Filters',
+        description: 'Number of output filters/feature maps',
+        default: 32,
+        validation: { min: 1, max: 1024, required: true },
+        ui: { tooltip: 'More filters = more features generated' }
+      },
+      {
+        key: 'kernel_size',
+        type: 'text',
+        label: 'Kernel Size',
+        description: 'Size of convolution window',
+        default: '(3,3)',
+        validation: { pattern: '^\\([0-9]+,[0-9]+\\)$' },
+        ui: { tooltip: 'e.g., (3,3) for 3x3 kernel' }
+      },
+      {
+        key: 'strides',
+        type: 'text',
+        label: 'Strides',
+        description: 'Stride of convolution (controls upsampling factor)',
+        default: '(2,2)',
+        validation: { pattern: '^\\([0-9]+,[0-9]+\\)$' },
+        ui: { tooltip: 'e.g., (2,2) doubles the spatial dimensions' }
+      },
+      {
+        key: 'padding',
+        type: 'select',
+        label: 'Padding',
+        description: 'Padding strategy',
+        default: 'same',
+        options: [
+          { value: 'valid', label: 'Valid', description: 'No padding, output size depends on kernel and stride' },
+          { value: 'same', label: 'Same', description: 'Padding to achieve predictable output size' }
+        ]
+      },
+      {
+        key: 'activation',
+        type: 'select',
+        label: 'Activation',
+        description: 'Activation function to use',
+        default: 'linear',
+        options: ACTIVATION_OPTIONS
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'Conv2DTranspose layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 3) {
+        return { isValid: false, errorMessage: 'Conv2DTranspose layer requires 3D input (height, width, channels)' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes, params) => {
+      if (inputShapes.length !== 1) return null
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 3) return null
+      
+      const [inputHeight, inputWidth] = inputShape
+      const filters = Number(params.filters) || 32
+      const kernelSize = parseTupleOrNumber(String(params.kernel_size) || '(3,3)')
+      const strides = parseTupleOrNumber(String(params.strides) || '(2,2)')
+      const padding = String(params.padding) || 'same'
+      
+      if (!kernelSize || !strides) return null
+      
+      let outputHeight: number
+      let outputWidth: number
+      
+      if (padding === 'same') {
+        outputHeight = inputHeight * strides[0]
+        outputWidth = inputWidth * strides[1]
+      } else {
+        // For 'valid' padding in transpose convolution
+        outputHeight = (inputHeight - 1) * strides[0] + kernelSize[0]
+        outputWidth = (inputWidth - 1) * strides[1] + kernelSize[1]
+      }
+      
+      return [outputHeight, outputWidth, filters]
+    },
+    generateCode: {
+      keras: (params) => {
+        const filters = Number(params.filters) || 32
+        const kernelSize = String(params.kernel_size) || '(3,3)'
+        const strides = String(params.strides) || '(2,2)'
+        const padding = String(params.padding) || 'same'
+        const activation = String(params.activation) || 'linear'
+        
+        let code = `Conv2DTranspose(${filters}, kernel_size=${kernelSize}, strides=${strides}, padding='${padding}'`
+        if (activation !== 'linear') {
+          code += `, activation='${activation}'`
+        }
+        code += ')'
+        
+        return code
+      }
+    },
+    supportsMultiplier: true,
+    supportsActivation: true
+  },
+
   // POOLING LAYERS
   // ============================================================================
   
@@ -755,6 +874,172 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         const padding = String(params.padding) || 'valid'
         
         return `MaxPool2D(pool_size=${poolSize}${strides}, padding='${padding}')`
+      }
+    }
+  },
+
+  ZeroPadding2D: {
+    metadata: {
+      category: 'convolutional',
+      icon: '🔲⬛',
+      description: 'Zero-padding layer for 2D spatial data',
+      tags: ['padding', 'zero', 'spatial', 'preprocessing'],
+      performance: {
+        complexity: 'O(H*W*C)',
+        memory: 'Low (just adds zeros)',
+        usage: 'Add zero padding around feature maps'
+      }
+    },
+    parameters: [
+      {
+        key: 'padding',
+        type: 'text',
+        label: 'Padding',
+        description: 'Amount of padding to add',
+        default: '(1,1)',
+        validation: { pattern: '^\\([0-9]+,[0-9]+\\)$|^[0-9]+$', required: true },
+        ui: { tooltip: 'Single number or (rows, cols). E.g., (1,1) adds 1 pixel border' }
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'ZeroPadding2D layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 3) {
+        return { isValid: false, errorMessage: 'ZeroPadding2D layer requires 3D input (height, width, channels)' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes, params) => {
+      if (inputShapes.length !== 1) return null
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 3) return null
+      
+      const [inputHeight, inputWidth, channels] = inputShape
+      const paddingStr = String(params.padding) || '(1,1)'
+      
+      let padRows: number, padCols: number
+      
+      // Handle both single number and tuple formats
+      if (paddingStr.includes('(')) {
+        const padding = parseTupleOrNumber(paddingStr)
+        if (!padding) return null
+        padRows = padding[0]
+        padCols = padding[1]
+      } else {
+        const singlePad = Number(paddingStr)
+        if (isNaN(singlePad)) return null
+        padRows = singlePad
+        padCols = singlePad
+      }
+      
+      const outputHeight = inputHeight + 2 * padRows
+      const outputWidth = inputWidth + 2 * padCols
+      
+      return [outputHeight, outputWidth, channels]
+    },
+    generateCode: {
+      keras: (params) => {
+        const paddingStr = String(params.padding) || '(1,1)'
+        
+        // Handle both single number and tuple formats
+        if (paddingStr.includes('(')) {
+          return `ZeroPadding2D(padding=${paddingStr})`
+        } else {
+          return `ZeroPadding2D(padding=${paddingStr})`
+        }
+      }
+    }
+  },
+
+  Cropping2D: {
+    metadata: {
+      category: 'convolutional',
+      icon: '✂️',
+      description: 'Cropping layer for 2D spatial data',
+      tags: ['cropping', 'spatial', 'preprocessing', 'resize'],
+      performance: {
+        complexity: 'O(1)',
+        memory: 'None (just removes data)',
+        usage: 'Remove pixels from borders of feature maps'
+      }
+    },
+    parameters: [
+      {
+        key: 'cropping',
+        type: 'text',
+        label: 'Cropping',
+        description: 'Amount of cropping to apply',
+        default: '((1,1),(1,1))',
+        validation: { pattern: '^\\(\\([0-9]+,[0-9]+\\),\\([0-9]+,[0-9]+\\)\\)$|^\\([0-9]+,[0-9]+\\)$|^[0-9]+$', required: true },
+        ui: { tooltip: 'Single number, (rows,cols) or ((top,bottom),(left,right)). E.g., ((1,1),(1,1)) crops 1 pixel from all sides' }
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'Cropping2D layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 3) {
+        return { isValid: false, errorMessage: 'Cropping2D layer requires 3D input (height, width, channels)' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes, params) => {
+      if (inputShapes.length !== 1) return null
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 3) return null
+      
+      const [inputHeight, inputWidth, channels] = inputShape
+      const croppingStr = String(params.cropping) || '((1,1),(1,1))'
+      
+      let topCrop: number, bottomCrop: number, leftCrop: number, rightCrop: number
+      
+      // Handle different cropping formats
+      if (croppingStr.includes('((')) {
+        // Format: ((top,bottom),(left,right))
+        const match = croppingStr.match(/\(\((\d+),(\d+)\),\((\d+),(\d+)\)\)/)
+        if (!match) return null
+        topCrop = Number(match[1])
+        bottomCrop = Number(match[2])
+        leftCrop = Number(match[3])
+        rightCrop = Number(match[4])
+      } else if (croppingStr.includes('(')) {
+        // Format: (rows,cols) - symmetric cropping
+        const match = croppingStr.match(/\((\d+),(\d+)\)/)
+        if (!match) return null
+        topCrop = bottomCrop = Number(match[1])
+        leftCrop = rightCrop = Number(match[2])
+      } else {
+        // Format: single number - symmetric cropping on all sides
+        const singleCrop = Number(croppingStr)
+        if (isNaN(singleCrop)) return null
+        topCrop = bottomCrop = leftCrop = rightCrop = singleCrop
+      }
+      
+      const outputHeight = inputHeight - topCrop - bottomCrop
+      const outputWidth = inputWidth - leftCrop - rightCrop
+      
+      // Ensure output dimensions are positive
+      if (outputHeight <= 0 || outputWidth <= 0) return null
+      
+      return [outputHeight, outputWidth, channels]
+    },
+    generateCode: {
+      keras: (params) => {
+        const croppingStr = String(params.cropping) || '((1,1),(1,1))'
+        
+        // Handle different cropping formats for Keras code generation
+        if (croppingStr.includes('((')) {
+          return `Cropping2D(cropping=${croppingStr})`
+        } else if (croppingStr.includes('(')) {
+          return `Cropping2D(cropping=${croppingStr})`
+        } else {
+          return `Cropping2D(cropping=${croppingStr})`
+        }
       }
     }
   },
@@ -880,12 +1165,141 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
         return `Dropout(${rate})`
       }
     }
+  },
+
+  // SEPARABLE CONVOLUTIONAL LAYERS
+  // ============================================================================
+  
+  SeparableConv2D: {
+    metadata: {
+      category: 'convolutional',
+      icon: '🔳',
+      description: 'Depthwise separable 2D convolution layer',
+      tags: ['convolution', 'cnn', '2d', 'separable', 'efficient'],
+      performance: {
+        complexity: 'O(H*W*C*K² + H*W*C*F) - more efficient than standard Conv2D',
+        memory: 'Lower than Conv2D due to factorized computation',
+        usage: 'Efficient feature extraction with fewer parameters'
+      }
+    },
+    parameters: [
+      {
+        key: 'filters',
+        type: 'number',
+        label: 'Filters',
+        description: 'Number of output filters/feature maps',
+        default: 32,
+        validation: { min: 1, max: 1024, required: true },
+        ui: { tooltip: 'More filters = more features detected' }
+      },
+      {
+        key: 'kernel_size',
+        type: 'text',
+        label: 'Kernel Size',
+        description: 'Size of convolution window',
+        default: '(3,3)',
+        validation: { pattern: '^\\([0-9]+,[0-9]+\\)$' },
+        ui: { tooltip: 'e.g., (3,3) for 3x3 kernel' }
+      },
+      {
+        key: 'strides',
+        type: 'text',
+        label: 'Strides',
+        description: 'Stride of convolution',
+        default: '(1,1)',
+        validation: { pattern: '^\\([0-9]+,[0-9]+\\)$' }
+      },
+      {
+        key: 'padding',
+        type: 'select',
+        label: 'Padding',
+        description: 'Padding strategy',
+        default: 'same',
+        options: [
+          { value: 'valid', label: 'Valid', description: 'No padding, output size reduced' },
+          { value: 'same', label: 'Same', description: 'Padding to keep same output size' }
+        ]
+      },
+      {
+        key: 'depth_multiplier',
+        type: 'number',
+        label: 'Depth Multiplier',
+        description: 'Number of depthwise convolution output channels for each input channel',
+        default: 1,
+        validation: { min: 1, max: 16 },
+        ui: { tooltip: 'Usually 1, higher values increase model capacity' }
+      },
+      {
+        key: 'activation',
+        type: 'select',
+        label: 'Activation',
+        description: 'Activation function to use',
+        default: 'linear',
+        options: ACTIVATION_OPTIONS
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'SeparableConv2D layer requires exactly one input' }
+      }
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 3) {
+        return { isValid: false, errorMessage: 'SeparableConv2D layer requires 3D input (height, width, channels)' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes, params) => {
+      if (inputShapes.length !== 1) return null
+      const inputShape = inputShapes[0]
+      if (inputShape.length !== 3) return null
+      
+      const [inputHeight, inputWidth] = inputShape
+      const filters = Number(params.filters) || 32
+      const kernelSize = parseTupleOrNumber(String(params.kernel_size) || '(3,3)')
+      const strides = parseTupleOrNumber(String(params.strides) || '(1,1)')
+      const padding = String(params.padding) || 'same'
+      
+      if (!kernelSize || !strides) return null
+      
+      let outputHeight: number
+      let outputWidth: number
+      
+      if (padding === 'same') {
+        outputHeight = Math.ceil(inputHeight / strides[0])
+        outputWidth = Math.ceil(inputWidth / strides[1])
+      } else {
+        outputHeight = Math.floor((inputHeight - kernelSize[0]) / strides[0]) + 1
+        outputWidth = Math.floor((inputWidth - kernelSize[1]) / strides[1]) + 1
+      }
+      
+      return [outputHeight, outputWidth, filters]
+    },
+    generateCode: {
+      keras: (params) => {
+        const filters = Number(params.filters) || 32
+        const kernelSize = String(params.kernel_size) || '(3,3)'
+        const strides = String(params.strides) || '(1,1)'
+        const padding = String(params.padding) || 'same'
+        const depthMultiplier = Number(params.depth_multiplier) || 1
+        const activation = String(params.activation) || 'linear'
+        
+        let code = `SeparableConv2D(${filters}, kernel_size=${kernelSize}, strides=${strides}, padding='${padding}'`
+        if (depthMultiplier !== 1) {
+          code += `, depth_multiplier=${depthMultiplier}`
+        }
+        if (activation !== 'linear') {
+          code += `, activation='${activation}'`
+        }
+        code += ')'
+        
+        return code
+      }
+    },
+    supportsMultiplier: true,
+    supportsActivation: true
   }
 }
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
 
 /**
  * Get all layer definitions
