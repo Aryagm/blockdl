@@ -1956,6 +1956,278 @@ export const layerDefinitions: Record<string, LayerDefinition> = {
     }
   },
 
+  Reshape: {
+    metadata: {
+      category: 'transformation',
+      icon: '🔀',
+      description: 'Reshapes input to a new shape',
+      tags: ['reshape', 'transformation', 'tensor'],
+      performance: {
+        complexity: 'O(1)',
+        memory: 'None (reshape only)',
+        usage: 'Change tensor dimensions without changing data'
+      }
+    },
+    parameters: [
+      {
+        key: 'target_shape',
+        type: 'text',
+        label: 'Target Shape',
+        description: 'Target shape for reshaping (excluding batch dimension)',
+        default: '(-1,)',
+        validation: { pattern: '^\\(.*\\)$', required: true },
+        ui: { tooltip: 'e.g., (28, 28, 1) or (-1, 784). Use -1 for automatic dimension' }
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'Reshape layer requires exactly one input' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes, params) => {
+      if (inputShapes.length !== 1) return null
+      const inputShape = inputShapes[0]
+      const targetShapeStr = String(params.target_shape) || '(-1,)'
+      
+      // Parse target shape string like "(28, 28, 1)" or "(-1, 784)"
+      const match = targetShapeStr.match(/^\((.*)\)$/)
+      if (!match) return null
+      
+      const dimensions = match[1].split(',').map(s => s.trim()).filter(s => s.length > 0)
+      const targetShape = dimensions.map(d => d === '-1' ? -1 : Number(d))
+      
+      // Calculate total elements in input
+      const totalElements = inputShape.reduce((acc, dim) => acc * dim, 1)
+      
+      // Handle -1 dimension (infer from total elements)
+      const autoIndex = targetShape.indexOf(-1)
+      if (autoIndex !== -1) {
+        const knownElements = targetShape.reduce((acc, dim) => dim === -1 ? acc : acc * dim, 1)
+        if (knownElements === 0 || totalElements % knownElements !== 0) return null
+        targetShape[autoIndex] = totalElements / knownElements
+      }
+      
+      // Verify total elements match
+      const targetElements = targetShape.reduce((acc, dim) => acc * dim, 1)
+      if (targetElements !== totalElements) return null
+      
+      return targetShape
+    },
+    generateCode: {
+      keras: (params) => {
+        const targetShape = String(params.target_shape) || '(-1,)'
+        return `Reshape(${targetShape})`
+      }
+    }
+  },
+
+  Permute: {
+    metadata: {
+      category: 'transformation',
+      icon: '🔄',
+      description: 'Permutes the dimensions of the input',
+      tags: ['permute', 'transpose', 'transformation', 'dimensions'],
+      performance: {
+        complexity: 'O(1)',
+        memory: 'None (metadata only)',
+        usage: 'Reorder tensor dimensions, e.g., channels-first to channels-last'
+      }
+    },
+    parameters: [
+      {
+        key: 'dims',
+        type: 'text',
+        label: 'Dimension Order',
+        description: 'New order of dimensions (1-indexed)',
+        default: '(2, 1)',
+        validation: { pattern: '^\\([0-9, ]+\\)$', required: true },
+        ui: { tooltip: 'e.g., (2, 1) swaps first two dimensions, (3, 1, 2) for cyclic permutation' }
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      void params; // Explicitly mark as intentionally unused
+      if (inputShapes.length !== 1) {
+        return { isValid: false, errorMessage: 'Permute layer requires exactly one input' }
+      }
+      return { isValid: true }
+    },
+    computeShape: (inputShapes, params) => {
+      if (inputShapes.length !== 1) return null
+      const inputShape = inputShapes[0]
+      const dimsStr = String(params.dims) || '(2, 1)'
+      
+      // Parse dimensions string like "(2, 1)" or "(3, 1, 2)"
+      const match = dimsStr.match(/^\((.*)\)$/)
+      if (!match) return null
+      
+      const dimensions = match[1].split(',').map(s => Number(s.trim())).filter(d => !isNaN(d))
+      
+      // Validate dimensions
+      if (dimensions.length !== inputShape.length) return null
+      if (Math.max(...dimensions) > inputShape.length || Math.min(...dimensions) < 1) return null
+      
+      // Check all dimensions are present and unique
+      const sortedDims = [...dimensions].sort()
+      for (let i = 0; i < sortedDims.length; i++) {
+        if (sortedDims[i] !== i + 1) return null
+      }
+      
+      // Apply permutation (convert from 1-indexed to 0-indexed)
+      const outputShape = dimensions.map(dim => inputShape[dim - 1])
+      return outputShape
+    },
+    generateCode: {
+      keras: (params) => {
+        const dims = String(params.dims) || '(2, 1)'
+        return `Permute(${dims})`
+      }
+    }
+  },
+
+  Merge: {
+    metadata: {
+      category: 'transformation',
+      icon: '🔀',
+      description: 'Merge multiple input tensors into one',
+      tags: ['merge', 'concatenate', 'add', 'multiply', 'combine'],
+      performance: {
+        complexity: 'O(N) where N is total elements',
+        memory: 'Low to moderate depending on operation',
+        usage: 'Combine multiple feature streams or skip connections'
+      }
+    },
+    parameters: [
+      {
+        key: 'mode',
+        type: 'select',
+        label: 'Merge Mode',
+        description: 'How to combine the inputs',
+        default: 'concat',
+        validation: { required: true },
+        options: [
+          { value: 'concat', label: 'Concatenate', description: 'Concatenate along specified axis' },
+          { value: 'add', label: 'Add', description: 'Element-wise addition' },
+          { value: 'multiply', label: 'Multiply', description: 'Element-wise multiplication' },
+          { value: 'average', label: 'Average', description: 'Element-wise average' },
+          { value: 'maximum', label: 'Maximum', description: 'Element-wise maximum' },
+          { value: 'minimum', label: 'Minimum', description: 'Element-wise minimum' },
+          { value: 'subtract', label: 'Subtract', description: 'Element-wise subtraction (first - second)' },
+          { value: 'dot', label: 'Dot Product', description: 'Dot product of inputs' }
+        ],
+        ui: { tooltip: 'concat increases size, others require same input shapes' }
+      },
+      {
+        key: 'axis',
+        type: 'number',
+        label: 'Concatenation Axis',
+        description: 'Axis along which to concatenate (-1 for last axis)',
+        default: -1,
+        validation: { min: -3, max: 3 },
+        conditional: { showWhen: { mode: ['concat'] } },
+        ui: { tooltip: '-1 for feature axis, 1 for height, 2 for width' }
+      }
+    ],
+    validateInputs: (inputShapes, params) => {
+      if (inputShapes.length < 2) {
+        return { isValid: false, errorMessage: 'Merge layer requires at least two inputs' }
+      }
+      
+      const mode = String(params.mode) || 'concat'
+      
+      if (mode === 'concat') {
+        // For concatenation, all dimensions except the concat axis must match
+        const axis = Number(params.axis) || -1
+        const firstShape = inputShapes[0]
+        
+        for (let i = 1; i < inputShapes.length; i++) {
+          const currentShape = inputShapes[i]
+          if (currentShape.length !== firstShape.length) {
+            return { isValid: false, errorMessage: 'All inputs must have the same number of dimensions for concatenation' }
+          }
+          
+          for (let dim = 0; dim < firstShape.length; dim++) {
+            const actualAxis = axis < 0 ? firstShape.length + axis : axis
+            if (dim !== actualAxis && currentShape[dim] !== firstShape[dim]) {
+              return { isValid: false, errorMessage: `Dimension ${dim} must match across all inputs for concatenation` }
+            }
+          }
+        }
+      } else {
+        // For other operations, all shapes must be identical
+        const firstShape = inputShapes[0]
+        for (let i = 1; i < inputShapes.length; i++) {
+          const currentShape = inputShapes[i]
+          if (currentShape.length !== firstShape.length) {
+            return { isValid: false, errorMessage: 'All inputs must have the same shape for element-wise operations' }
+          }
+          for (let dim = 0; dim < firstShape.length; dim++) {
+            if (currentShape[dim] !== firstShape[dim]) {
+              return { isValid: false, errorMessage: 'All inputs must have the same shape for element-wise operations' }
+            }
+          }
+        }
+      }
+      
+      return { isValid: true }
+    },
+    computeShape: (inputShapes, params) => {
+      if (inputShapes.length < 2) return null
+      
+      const mode = String(params.mode) || 'concat'
+      const firstShape = inputShapes[0]
+      
+      if (mode === 'concat') {
+        const axis = Number(params.axis) || -1
+        const actualAxis = axis < 0 ? firstShape.length + axis : axis
+        
+        if (actualAxis < 0 || actualAxis >= firstShape.length) return null
+        
+        // Sum the dimensions along the concatenation axis
+        let concatDim = 0
+        for (const shape of inputShapes) {
+          concatDim += shape[actualAxis]
+        }
+        
+        const outputShape = [...firstShape]
+        outputShape[actualAxis] = concatDim
+        return outputShape
+      } else {
+        // For element-wise operations, output shape is same as input shape
+        return firstShape
+      }
+    },
+    generateCode: {
+      keras: (params) => {
+        const mode = String(params.mode) || 'concat'
+        
+        switch (mode) {
+          case 'concat': {
+            const axis = Number(params.axis) || -1
+            return `Concatenate(axis=${axis})`
+          }
+          case 'add':
+            return `Add()`
+          case 'multiply':
+            return `Multiply()`
+          case 'average':
+            return `Average()`
+          case 'maximum':
+            return `Maximum()`
+          case 'minimum':
+            return `Minimum()`
+          case 'subtract':
+            return `Subtract()`
+          case 'dot':
+            return `Dot(axes=-1)`
+          default:
+            return `Concatenate()`
+        }
+      }
+    }
+  },
+
   // ACTIVATION LAYERS
   // ============================================================================
   
