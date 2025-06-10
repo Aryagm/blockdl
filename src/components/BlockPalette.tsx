@@ -177,8 +177,6 @@ export default function BlockPalette({
     <div
       className={`space-y-6 p-6 h-full overflow-y-auto bg-slate-50/80 ${className}`}
     >
-      <h2 className="font-semibold text-slate-800 text-lg">Block Palette</h2>
-
       {/* Tab Navigation */}
       <div className="flex space-x-2 bg-white rounded-lg p-1 border border-slate-200">
         <button
