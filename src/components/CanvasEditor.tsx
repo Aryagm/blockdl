@@ -26,6 +26,7 @@ import type {
 import "@xyflow/react/dist/style.css";
 
 import { LayerNode } from "./LayerNode";
+import { CopyPasteControls } from "./CopyPasteControls";
 import { getDefaultParams } from "../lib/layers/parameters";
 import { getTemplateById } from "../lib/templates";
 import { useFlowStore } from "../lib/flow-store";
@@ -204,6 +205,7 @@ function CanvasEditorInner({ className = "" }: CanvasEditorProps) {
       >
         <Controls />
         <MiniMap />
+        <CopyPasteControls />
         <Background
           variant={BackgroundVariant.Lines}
           gap={FLOW_CONFIG.BACKGROUND.GAP}

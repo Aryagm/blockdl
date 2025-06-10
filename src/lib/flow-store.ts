@@ -45,6 +45,13 @@ interface FlowState {
   addNode: (node: Node) => void;
   addNodesAndEdges: (newNodes: Node[], newEdges: Edge[]) => void;
   
+  // Copy-paste functionality
+  copiedNodes: Node[];
+  copiedEdges: Edge[];
+  copyNodes: (nodeIds: string[]) => void;
+  pasteNodes: (position?: { x: number; y: number }) => void;
+  canPaste: () => boolean;
+  
   // Shape validation
   updateShapeErrors: () => void;
   
@@ -151,6 +158,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   history: [],
   historyIndex: -1,
   _isRestoringFromHistory: false,
+  
+  // Copy-paste state
+  copiedNodes: [],
+  copiedEdges: [],
 
   // History management
   saveToHistory: () => {
@@ -342,6 +353,104 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       };
       set({ history: [initialEntry], historyIndex: 0 });
     }
+  },
+
+  // Copy-paste functionality
+  copyNodes: (nodeIds: string[]) => {
+    const { nodes, edges } = get();
+    
+    // Get the nodes to copy
+    const nodesToCopy = nodes.filter(node => nodeIds.includes(node.id));
+    
+    // Get the edges that connect the copied nodes
+    const edgesToCopy = edges.filter(edge => 
+      nodeIds.includes(edge.source) && nodeIds.includes(edge.target)
+    );
+    
+    set({ 
+      copiedNodes: JSON.parse(JSON.stringify(nodesToCopy)),
+      copiedEdges: JSON.parse(JSON.stringify(edgesToCopy))
+    });
+  },
+
+  pasteNodes: (position?: { x: number; y: number }) => {
+    const { copiedNodes, copiedEdges, nodes } = get();
+    
+    if (copiedNodes.length === 0) return;
+    
+    const timestamp = Date.now();
+    const nodeIdMap = new Map<string, string>();
+    
+    // Calculate paste position
+    const pastePosition = position || { x: 50, y: 50 };
+    
+    // Find the bounds of the copied nodes to determine offset
+    let minX = Number.MAX_SAFE_INTEGER;
+    let minY = Number.MAX_SAFE_INTEGER;
+    
+    copiedNodes.forEach(node => {
+      minX = Math.min(minX, node.position.x);
+      minY = Math.min(minY, node.position.y);
+    });
+    
+    // Create new nodes with unique IDs and adjusted positions
+    const newNodes: Node[] = copiedNodes.map((node) => {
+      const nodeData = node.data as { type: string; params: Record<string, unknown> };
+      const newId = `${nodeData.type.toLowerCase()}-${timestamp}-${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+      nodeIdMap.set(node.id, newId);
+      
+      return {
+        ...node,
+        id: newId,
+        position: {
+          x: pastePosition.x + (node.position.x - minX),
+          y: pastePosition.y + (node.position.y - minY),
+        },
+        selected: true,
+      };
+    });
+    
+    // Create new edges with updated node IDs
+    const newEdges = copiedEdges
+      .map((edge) => {
+        const sourceId = nodeIdMap.get(edge.source);
+        const targetId = nodeIdMap.get(edge.target);
+        
+        if (!sourceId || !targetId) return null;
+        
+        return {
+          ...edge,
+          id: `${sourceId}-${targetId}`,
+          source: sourceId,
+          target: targetId,
+        };
+      })
+      .filter((edge): edge is NonNullable<typeof edge> => edge !== null);
+    
+    // Deselect all existing nodes first
+    const updatedExistingNodes = nodes.map(node => ({ ...node, selected: false }));
+    
+    // Add the pasted nodes and edges
+    set({ nodes: [...updatedExistingNodes, ...newNodes] });
+    
+    // Save to history after pasting
+    if (!get()._isRestoringFromHistory) {
+      get().saveToHistory();
+    }
+    
+    // Add edges if any
+    if (newEdges.length > 0) {
+      set({ edges: [...get().edges, ...newEdges] });
+    }
+    
+    scheduleShapeUpdate(() => get().updateShapeErrors());
+  },
+
+  canPaste: () => {
+    const { copiedNodes } = get();
+    return copiedNodes.length > 0;
   },
 
   // Shape validation
