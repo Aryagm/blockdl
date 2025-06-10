@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Play, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Logo } from "./Logo";
-import { Dialog, DialogContent } from "./ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
 
 interface WelcomeModalProps {
   open?: boolean;
@@ -40,6 +40,12 @@ export function WelcomeModal({ open, onOpenChange }: WelcomeModalProps) {
         className="!max-w-5xl w-[90vw] !p-0 gap-0 overflow-hidden"
         showCloseButton={false}
       >
+        {/* Screen reader accessibility */}
+        <DialogTitle className="sr-only">Welcome to BlockDL</DialogTitle>
+        <DialogDescription className="sr-only">
+          Build neural network architectures visually with intuitive drag-and-drop blocks. Watch the demo video to get started.
+        </DialogDescription>
+        
         <Button
           variant="outline"
           size="sm"
