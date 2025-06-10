@@ -54,8 +54,7 @@ function CanvasEditorInner({ className = "" }: CanvasEditorProps) {
     onEdgesChange: handleEdgesChange,
     onConnect: handleConnect,
     addNode,
-    setNodes,
-    setEdges,
+    addNodesAndEdges,
   } = useFlowStore();
 
   const [reactFlowInstance, setReactFlowInstance] =
@@ -172,11 +171,10 @@ function CanvasEditorInner({ className = "" }: CanvasEditorProps) {
           .filter((edge): edge is NonNullable<typeof edge> => edge !== null);
 
         // Add all nodes and edges at once
-        setNodes([...nodes, ...newNodes]);
-        setEdges([...edges, ...newEdges]);
+        addNodesAndEdges(newNodes, newEdges);
       }
     },
-    [reactFlowInstance, addNode, setNodes, setEdges, nodes, edges]
+    [reactFlowInstance, addNode, addNodesAndEdges]
   );
 
   return (

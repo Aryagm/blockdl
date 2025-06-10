@@ -1,10 +1,3 @@
-/**
- * Flow Store - State management for the visual neural network editor
- * 
- * Manages nodes, edges, and undo/redo history for the React Flow canvas.
- * Includes automatic shape validation and error detection.
- */
-
 import { create } from "zustand";
 import { addEdge, applyNodeChanges, applyEdgeChanges } from "@xyflow/react";
 import type {
@@ -18,59 +11,38 @@ import { parseGraphToDAG } from "./dag-parser";
 import { computeShapes } from "./shape-computation";
 import { getLayerDefinition } from "./layer-definitions";
 
-/**
- * State interface for the flow editor store
- */
 interface FlowState {
-  // Current state
   nodes: Node[];
   edges: Edge[];
   
-  // History management
+  // History for undo/redo
   history: Array<{ nodes: Node[]; edges: Edge[] }>;
   historyIndex: number;
 
-  // Core state operations
+  // Actions
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
-  setNodesWithoutHistory: (nodes: Node[]) => void;
-  setEdgesWithoutHistory: (edges: Edge[]) => void;
-  
-  // React Flow event handlers
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
-  
-  // User actions
   addNode: (node: Node) => void;
-  addNodesAndEdges: (newNodes: Node[], newEdges: Edge[]) => void;
-  
-  // Shape validation
   updateShapeErrors: () => void;
   
-  // History operations
+  // Undo/Redo functionality
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
   canRedo: () => boolean;
   clearHistory: () => void;
   saveToHistory: () => void;
-  initializeHistory: () => void;
-  
-  // Internal state
-  _isRestoringFromHistory: boolean;
 }
 
-/**
- * Configuration constants for the flow store
- */
+// Constants for configuration
 const SHAPE_UPDATE_DEBOUNCE_MS = 100;
 const DEFAULT_INPUT_SHAPE = "(28, 28, 1)";
-const MAX_HISTORY_SIZE = 10;
+const MAX_HISTORY_SIZE = 50;
 
-/**
- * Debouncing utility for shape error updates to prevent excessive computation
- */
+// Debouncing utility for shape error updates
 let shapeUpdateTimeout: NodeJS.Timeout | null = null;
 
 const scheduleShapeUpdate = (updateFn: () => void) => {
@@ -145,20 +117,13 @@ const updateNodesWithErrors = (
 };
 
 export const useFlowStore = create<FlowState>((set, get) => ({
-  // Initial state
   nodes: [],
   edges: [],
   history: [],
   historyIndex: -1,
-  _isRestoringFromHistory: false,
 
-  // History management
   saveToHistory: () => {
-    const { nodes, edges, history, historyIndex, _isRestoringFromHistory } = get();
-    
-    // Don't save to history if we're currently restoring from history
-    if (_isRestoringFromHistory) return;
-    
+    const { nodes, edges, history, historyIndex } = get();
     const newHistoryEntry = { 
       nodes: JSON.parse(JSON.stringify(nodes)), 
       edges: JSON.parse(JSON.stringify(edges)) 
@@ -178,40 +143,29 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({ history: newHistory });
   },
 
-  // Core state operations
   setNodes: (nodes: Node[]) => {
+    get().saveToHistory();
     set({ nodes });
     scheduleShapeUpdate(() => get().updateShapeErrors());
   },
 
   setEdges: (edges: Edge[]) => {
+    get().saveToHistory();
     set({ edges });
     scheduleShapeUpdate(() => get().updateShapeErrors());
   },
 
-  setNodesWithoutHistory: (nodes: Node[]) => {
-    set({ nodes });
-    scheduleShapeUpdate(() => get().updateShapeErrors());
-  },
-
-  setEdgesWithoutHistory: (edges: Edge[]) => {
-    set({ edges });
-    scheduleShapeUpdate(() => get().updateShapeErrors());
-  },
-
-  // React Flow event handlers
   onNodesChange: (changes: NodeChange[]) => {
-    // Save to history BEFORE applying changes for certain operations
-    const hasRemoveOrPositionEnd = changes.some(change => 
-      change.type === 'remove' || 
-      (change.type === 'position' && !change.dragging)
+    // Only save to history for significant changes (not selections, etc.)
+    const hasSignificantChange = changes.some(change => 
+      change.type === 'remove' || change.type === 'add' || 
+      (change.type === 'position' && !(change as any).dragging)
     );
     
-    if (hasRemoveOrPositionEnd && !get()._isRestoringFromHistory) {
+    if (hasSignificantChange) {
       get().saveToHistory();
     }
     
-    // Apply changes
     set({
       nodes: applyNodeChanges(changes, get().nodes),
     });
@@ -219,14 +173,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   onEdgesChange: (changes: EdgeChange[]) => {
-    // Save to history BEFORE applying edge deletions
-    const hasRemove = changes.some(change => change.type === 'remove');
+    // Only save to history for significant changes
+    const hasSignificantChange = changes.some(change => 
+      change.type === 'remove' || change.type === 'add'
+    );
     
-    if (hasRemove && !get()._isRestoringFromHistory) {
+    if (hasSignificantChange) {
       get().saveToHistory();
     }
     
-    // Apply changes
     set({
       edges: applyEdgeChanges(changes, get().edges),
     });
@@ -234,70 +189,36 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   onConnect: (connection: Connection) => {
-    // Save to history BEFORE creating new connection
-    if (!get()._isRestoringFromHistory) {
-      get().saveToHistory();
-    }
-    
+    get().saveToHistory();
     const edgeWithType = {
       ...connection,
       type: "smoothstep" as const,
       style: { strokeWidth: 2, stroke: "#6b7280" },
     };
-    
     set({
       edges: addEdge(edgeWithType, get().edges),
     });
     scheduleShapeUpdate(() => get().updateShapeErrors());
   },
 
-  // User actions
   addNode: (node: Node) => {
-    // Apply the change first
+    get().saveToHistory();
     set({
       nodes: [...get().nodes, node],
     });
-    
-    // Save to history after making changes
-    if (!get()._isRestoringFromHistory) {
-      get().saveToHistory();
-    }
-    
     scheduleShapeUpdate(() => get().updateShapeErrors());
   },
 
-  addNodesAndEdges: (newNodes: Node[], newEdges: Edge[]) => {
-    const { nodes, edges } = get();
-    
-    // Apply the changes first
-    set({
-      nodes: [...nodes, ...newNodes],
-      edges: [...edges, ...newEdges],
-    });
-    
-    // Save to history after making changes
-    if (!get()._isRestoringFromHistory) {
-      get().saveToHistory();
-    }
-    
-    scheduleShapeUpdate(() => get().updateShapeErrors());
-  },
-
-  // History operations
   undo: () => {
     const { history, historyIndex } = get();
     if (historyIndex > 0) {
       const prevState = history[historyIndex - 1];
       set({ 
-        _isRestoringFromHistory: true,
         nodes: prevState.nodes, 
         edges: prevState.edges, 
         historyIndex: historyIndex - 1 
       });
-      scheduleShapeUpdate(() => {
-        get().updateShapeErrors();
-        set({ _isRestoringFromHistory: false });
-      });
+      scheduleShapeUpdate(() => get().updateShapeErrors());
     }
   },
 
@@ -306,15 +227,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     if (historyIndex < history.length - 1) {
       const nextState = history[historyIndex + 1];
       set({ 
-        _isRestoringFromHistory: true,
         nodes: nextState.nodes, 
         edges: nextState.edges, 
         historyIndex: historyIndex + 1 
       });
-      scheduleShapeUpdate(() => {
-        get().updateShapeErrors();
-        set({ _isRestoringFromHistory: false });
-      });
+      scheduleShapeUpdate(() => get().updateShapeErrors());
     }
   },
 
@@ -332,19 +249,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({ history: [], historyIndex: -1 });
   },
 
-  initializeHistory: () => {
-    const { nodes, edges, history } = get();
-    // Only initialize if history is empty and we have no content
-    if (history.length === 0 && nodes.length === 0 && edges.length === 0) {
-      const initialEntry = { 
-        nodes: JSON.parse(JSON.stringify(nodes)), 
-        edges: JSON.parse(JSON.stringify(edges)) 
-      };
-      set({ history: [initialEntry], historyIndex: 0 });
-    }
-  },
-
-  // Shape validation
   updateShapeErrors: () => {
     const { nodes, edges } = get();
 
@@ -372,8 +276,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           errorMap
         );
         if (hasChanges) {
-          // Update nodes without triggering history save
-          set((state) => ({ ...state, nodes: updatedNodes }));
+          set({ nodes: updatedNodes });
         }
         return;
       }
@@ -391,13 +294,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         errorMap
       );
       if (hasChanges) {
-        // Update nodes without triggering history save
-        set((state) => ({ ...state, nodes: updatedNodes }));
+        set({ nodes: updatedNodes });
       }
     } catch (error) {
-      // Log shape computation errors for debugging
-      console.warn(
-        "Shape computation failed:",
+      console.error(
+        "Error computing shapes:",
         error instanceof Error ? error.message : "Unknown error"
       );
     }

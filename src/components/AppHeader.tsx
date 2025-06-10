@@ -4,6 +4,7 @@ import { Download, Upload, HelpCircle, Trash2 } from "lucide-react";
 
 import { Button } from "./ui/button";
 import { Logo } from "./Logo";
+import { UndoRedoControls } from "./UndoRedoControls";
 import {
   Dialog,
   DialogContent,
@@ -118,6 +119,11 @@ export function AppHeader({
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Undo/Redo Controls */}
+        <UndoRedoControls />
+        
+        {/* Project Controls */}
+        <div className="flex items-center gap-2 border-l border-slate-200 pl-2">
         <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
           <DialogTrigger asChild>
             <Button
@@ -172,6 +178,7 @@ export function AppHeader({
           <Upload className="h-4 w-4" />
           Import
         </Button>
+        </div>
 
         <Dialog open={showHelpDialog} onOpenChange={setShowHelpDialog}>
           <DialogTrigger asChild>

@@ -9,8 +9,13 @@ import { useFlowStore } from "./lib/flow-store";
 import "./App.css";
 
 function App() {
-  const { nodes, edges, setNodes, setEdges } = useFlowStore();
+  const { nodes, edges, setNodes, setEdges, initializeHistory } = useFlowStore();
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+
+  // Initialize history when app starts
+  useEffect(() => {
+    initializeHistory();
+  }, [initializeHistory]);
 
   // Check if this is a new tab/window (not a refresh)
   useEffect(() => {
