@@ -19,6 +19,7 @@ import {
 import type {
   Node,
   NodeTypes,
+  EdgeTypes,
   ReactFlowInstance,
   XYPosition,
 } from "@xyflow/react";
@@ -26,6 +27,7 @@ import type {
 import "@xyflow/react/dist/style.css";
 
 import { LayerNode } from "./LayerNode";
+import { DeletableEdge } from "./DeletableEdge";
 import { CopyPasteControls } from "./CopyPasteControls";
 import { getDefaultParams } from "../lib/layers/parameters";
 import { getTemplateById } from "../lib/templates";
@@ -39,6 +41,9 @@ const FLOW_CONFIG = {
 } as const;
 
 const nodeTypes: NodeTypes = { layerNode: LayerNode };
+const edgeTypes: EdgeTypes = { 
+  smoothstep: DeletableEdge,
+};
 
 /**
  * Props for CanvasEditor component
@@ -190,6 +195,7 @@ function CanvasEditorInner({ className = "" }: CanvasEditorProps) {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         attributionPosition="top-right"
         deleteKeyCode={[]}
