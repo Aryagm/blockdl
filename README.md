@@ -4,7 +4,8 @@
 
 BlockDL is a web-based visual editor for building deep learning models. Drag and drop layers, connect them visually, and generate Keras code automatically.
 
-<video src="public/demo-optimized.mp4" controls="false"></video>
+
+https://github.com/user-attachments/assets/dd797164-ea8e-41a1-9c29-1e95a17fb144
 
 
 > This repository contains the code for the core code-generation interface and engine. The courses on BlockDL.com are yet to be open-sourced.
