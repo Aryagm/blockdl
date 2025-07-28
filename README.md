@@ -44,10 +44,6 @@ Visit https://blockdl.com to start designing neural networks immediately.
    Navigate to `http://localhost:5173`
 
 
-## 🤝 Contributing
-
-While this repository is not the main, bug reports and feature suggestions are welcome! Please open an issue to discuss any changes.
-
 ## 📄 License
 
 This project is licensed under the Mozilla Public License 2.0 - see the [LICENSE.md](LICENSE.md) file for details.
