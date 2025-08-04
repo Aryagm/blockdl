@@ -5,10 +5,12 @@ import { Check, Copy, Download } from "lucide-react";
 
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { parseGraphToDAG, type DAGResult } from "../lib/dag-parser";
 import {
   generateKerasCode,
   generateFunctionalKerasCode,
+  generatePyTorchCode,
 } from "../lib/code-generation";
 import { useFlowStore } from "../lib/flow-store";
 import { cn } from "../lib/utils";
@@ -69,6 +71,14 @@ function APIBadge({ codeType }: APIBadgeProps) {
       )}
     >
       {isFunctional ? "Functional API" : "Sequential API"}
+    </span>
+  );
+}
+
+function BetaBadge() {
+  return (
+    <span className="text-xs px-3 py-1.5 rounded-full font-medium border bg-orange-100 text-orange-700 border-orange-200">
+      Beta
     </span>
   );
 }
@@ -173,7 +183,7 @@ interface CodeViewerProps {
   className?: string;
 }
 
-// Generates Keras code from visual neural network graph
+// Generates code from visual neural network graph
 export function CodeViewer({ className = "" }: CodeViewerProps) {
   const { nodes, edges } = useFlowStore();
   const [generatedCode, setGeneratedCode] = useState("");
@@ -181,6 +191,7 @@ export function CodeViewer({ className = "" }: CodeViewerProps) {
   const [codeType, setCodeType] = useState<"sequential" | "functional">(
     "sequential"
   );
+  const [framework, setFramework] = useState<"keras" | "pytorch">("keras");
 
   const resetCopyState = useCallback(() => {
     setTimeout(() => setIsCopied(false), UI_CONFIG.COPY_TIMEOUT);
@@ -200,20 +211,25 @@ export function CodeViewer({ className = "" }: CodeViewerProps) {
         return;
       }
 
-      const shouldUseFunctional = checkIfFunctionalAPINeeded(dagResult);
-
-      if (shouldUseFunctional) {
-        setCodeType("functional");
-        const functionalCode = await generateFunctionalKerasCode(dagResult);
-        setGeneratedCode(functionalCode);
+      if (framework === "pytorch") {
+        setCodeType("sequential"); // PyTorch doesn't need functional distinction
+        setGeneratedCode(generatePyTorchCode(dagResult.orderedNodes));
       } else {
-        setCodeType("sequential");
-        setGeneratedCode(generateKerasCode(dagResult.orderedNodes));
+        const shouldUseFunctional = checkIfFunctionalAPINeeded(dagResult);
+
+        if (shouldUseFunctional) {
+          setCodeType("functional");
+          const functionalCode = await generateFunctionalKerasCode(dagResult);
+          setGeneratedCode(functionalCode);
+        } else {
+          setCodeType("sequential");
+          setGeneratedCode(generateKerasCode(dagResult.orderedNodes));
+        }
       }
     };
 
     generateCode();
-  }, [nodes, edges]);
+  }, [nodes, edges, framework]);
 
   const handleCopyCode = useCallback(async () => {
     if (!generatedCode.trim()) return;
@@ -238,13 +254,13 @@ export function CodeViewer({ className = "" }: CodeViewerProps) {
     const link = document.createElement("a");
 
     link.href = url;
-    link.download = `keras_model_${codeType}.py`;
+    link.download = `${framework}_model_${codeType}.py`;
     document.body.appendChild(link);
     link.click();
 
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  }, [generatedCode, codeType]);
+  }, [generatedCode, codeType, framework]);
 
   return (
     <div className={cn("h-full flex flex-col bg-slate-50/80", className)}>
@@ -261,10 +277,22 @@ export function CodeViewer({ className = "" }: CodeViewerProps) {
                 <div className="flex items-center gap-2">
                   <span className="text-xl">🐍</span>
                   <CardTitle className="text-xl text-slate-800 font-semibold">
-                    Keras Code
+                    {framework === "pytorch" ? "PyTorch" : "Keras"} Code
                   </CardTitle>
                 </div>
-                <APIBadge codeType={codeType} />
+                {framework === "keras" && <APIBadge codeType={codeType} />}
+                {framework === "pytorch" && <BetaBadge />}
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={framework} onValueChange={(value: "keras" | "pytorch") => setFramework(value)}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Framework" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="keras">Keras</SelectItem>
+                    <SelectItem value="pytorch">PyTorch</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <ActionButtons

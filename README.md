@@ -3,6 +3,8 @@
 ![](banner.png)
 **An easy visual way to design neural networks**
 
+> Now Supports PyTorch!
+
 BlockDL is a web-based visual editor for building deep learning models. Drag and drop layers, connect them visually, and generate Keras code automatically.
 
 https://github.com/user-attachments/assets/dd797164-ea8e-41a1-9c29-1e95a17fb144
@@ -13,8 +15,8 @@ https://github.com/user-attachments/assets/dd797164-ea8e-41a1-9c29-1e95a17fb144
 ## ✨ Features
 
 - 🎨 **Visual Design**: Drag and drop neural network layers
-- 🔗 **Smart Connections**: Automatic shape validation, so you catcj problems early.
-- 🐍 **Code Generation**: Copy working Keras code instantly as you build your network
+- 🔗 **Smart Connections**: Automatic shape validation, so you catch problems early.
+- 🐍 **Code Generation**: Copy working Keras and Pytorch code instantly as you build your network
 - 🚀 **No Installation**: Runs entirely in your browser
 
 ## 🚀 Quick Start
